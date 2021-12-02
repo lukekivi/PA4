@@ -5,5 +5,9 @@
 
 void printSyntax();
 
+void log();
+
+void worker();
+
 #endif
 
