@@ -46,5 +46,12 @@ typedef enum {
 
 void bookeepingCode();
 
+/**
+ * @brief Check if a string is composed strictly of digits
+ * @param str a string
+ * @return -1 if a non-digit character was found, 1 if str is composed of digits
+ */
+int isDigits(char* str);
+
 #endif
 

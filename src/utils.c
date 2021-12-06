@@ -28,3 +28,16 @@ void bookeepingCode()
     sleep(1);
     _createOutputDir();
 }
+
+/* Check a string to see if it is strictly composed of digits */
+int isDigits(char* str) {
+    int len = strlen(str);
+
+    for (int i = 0; i < len; i++) {
+        if (str[i] < '0' || str[i] > '9') {
+            return -1;
+        }
+    }
+
+    return 1;
+}

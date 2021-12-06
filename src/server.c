@@ -63,13 +63,13 @@ int main(int argc, char *argv[]) {
     // create empty output folder
     bookeepingCode();
 
-    // // Start log thead
-    // pthread_t logThread;
+    // Start log thead
+    pthread_t logThread;
 
-    // if (pthread_create(&logThread, NULL, log, NULL) != 0) {
-    //     fprintf(stderr, "ERROR: Failed to start log thread\n");
-    //     exit(EXIT_FAILURE);
-    // }
+    if (pthread_create(&logThread, NULL, log, NULL) != 0) {
+         fprintf(stderr, "ERROR: Failed to start log thread\n");
+         exit(EXIT_FAILURE);
+    }
 
     // create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -81,12 +81,11 @@ int main(int argc, char *argv[]) {
         printf("Socket successfully created...\n");
     }
 
-    bzero(&servaddr, sizeof(servaddr)); // ???
+    bzero(&servaddr, sizeof(servaddr)); 
 
-    // Local host
     char* LOCAL_HOST = argv[1];
-    // Port
     char* PORT = argv[2];
+    int nWorkers = argv[3];
 
     // assign IP, PORT
     servaddr.sin_family = AF_INET;
@@ -113,8 +112,14 @@ int main(int argc, char *argv[]) {
     pthread_t tid;
     int connfd_arr[NCLIENTS];
 
-    // Num workers
-    nWorkers = atoi(argv[3]);
+    // create worker threads
+    int* workerThreads[nWorkers];
+    for (int i = 0; i < nWorkers; i++) {
+        if ((pthread_create(&workerThreads[i], NULL, worker, NULL) != 0) {
+            fprintf(stderr, "ERROR: Failed to start worker thread\n");
+            exit(EXIT_FAILURE);
+        }
+    } 
 
     while (1) {
         // Accept the data packet from client and verification
@@ -124,17 +129,6 @@ int main(int argc, char *argv[]) {
             exit(0);
         } else
             printf("Server accept the client...\n");
-
-        // TODO: pthread_create and pass client socket (connfd_arr[]) to the thread
-        int* workerThreads[nWorkers];
-        for (int i = 0; i < nWorkers; i++) {
-            if ((pthread_create(&workerThreads[i], NULL, worker, (void *)&connfd_arr[count % NCLIENTS])) != 0) {
-                fprintf(stderr, "ERROR: Failed to start worker thread\n");
-                exit(EXIT_FAILURE);
-            }
-        }  
-        
-        count++;
     }
 
     // Server never shut down
