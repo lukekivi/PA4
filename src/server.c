@@ -6,6 +6,7 @@ void printSyntax() {
     printf("usage: $ ./server server_addr server_port num_workers\n");
 }
 
+// Commented out because it's not for interim
 // void log() {
 //     // Get the correct filepath
 //     char file[MAX_STR] = "output/";
@@ -19,16 +20,8 @@ void printSyntax() {
 //     }
 // }
 
-void* worker(void *arg) {
+void* worker(void* arg) {
     int sockfd = *(int *) arg;
-    char clientid[MAX_STR];
-    memset(clientid, 0, MAX_STR);
-    int size = read(sockfd, clientid, sizeof(clientid));
-    if (size < 0) {
-        perror("read error");
-        exit(1);
-    }
-    printf("\t CLient (client ID: %s) has logged in.\n", clientid);
 
     // receive enumerated value from client and print it to standard output
     char recv[MAX_STR];
@@ -48,10 +41,13 @@ void* worker(void *arg) {
         }
         printf("\tRe-transmit %s to client.\n", recv);
     } while (strcmp(recv, "TERMINATE") != 0);
+
+    // close socket
+    close(sockfd);
 }
 
 int main(int argc, char *argv[]) {
-    int sockfd, len;
+    int sockfd, len, connfd;
     struct sockaddr_in servaddr, cli;
 
     // argument handling
@@ -63,13 +59,14 @@ int main(int argc, char *argv[]) {
     // create empty output folder
     bookeepingCode();
 
-    // Start log thead
-    pthread_t logThread;
+    // Commented out because it's not for interim
+    // // Start log thead
+    // pthread_t logThread;
 
-    if (pthread_create(&logThread, NULL, log, NULL) != 0) {
-         fprintf(stderr, "ERROR: Failed to start log thread\n");
-         exit(EXIT_FAILURE);
-    }
+    // if (pthread_create(&logThread, NULL, log, NULL) != 0) {
+    //      fprintf(stderr, "ERROR: Failed to start log thread\n");
+    //      exit(EXIT_FAILURE);
+    // }
 
     // create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -80,23 +77,24 @@ int main(int argc, char *argv[]) {
     else {
         printf("Socket successfully created...\n");
     }
-
     bzero(&servaddr, sizeof(servaddr)); 
 
-    char* LOCAL_HOST = argv[1];
+    char* server_addr = argv[1];
+    int LOCAL_PORT = atoi(server_addr);
     char* PORT = argv[2];
-    int nWorkers = argv[3];
+    // int nWorkers = argv[3]; // Commented out because it's not for interim
 
     // assign IP, PORT
     servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = inet_addr(LOCAL_HOST);
+    servaddr.sin_addr.s_addr = inet_addr(server_addr);
     servaddr.sin_port = htons(inet_addr(PORT));
 
     // Binding newly created socket to given IP and verification
-    if ((bind(sockfd, (SA *)&servaddr, sizeof(servaddr))) != 0) {
+    if ((bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr))) != 0) {
         printf("Socket bind failed...\n");
         exit(0);
-    } else
+    }
+    else
         printf("Socket successfully binded..\n");
 
     // Now server is ready to listen and verification
@@ -115,7 +113,7 @@ int main(int argc, char *argv[]) {
     // create worker threads
     int* workerThreads[nWorkers];
     for (int i = 0; i < nWorkers; i++) {
-        if ((pthread_create(&workerThreads[i], NULL, worker, NULL) != 0) {
+        if (pthread_create(&workerThreads[i], NULL, worker, NULL) != 0) {
             fprintf(stderr, "ERROR: Failed to start worker thread\n");
             exit(EXIT_FAILURE);
         }
@@ -123,13 +121,16 @@ int main(int argc, char *argv[]) {
 
     while (1) {
         // Accept the data packet from client and verification
-        connfd_arr[count % NCLIENTS] = accept(sockfd, (SA *)&cli, &len);
+        connfd_arr[count % NCLIENTS] = accept(sockfd, (struct sockaddr *)&cli, &len);
         if (connfd_arr[count % NCLIENTS] < 0) {
             printf("Server accept failed...\n");
             exit(0);
         } else
             printf("Server accept the client...\n");
+
+        pthread_create(&tid, NULL, worker, (void *)&connfd_arr[count % NCLIENTS]);
     }
+
 
     // Server never shut down
     close(sockfd);
