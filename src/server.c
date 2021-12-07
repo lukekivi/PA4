@@ -44,12 +44,14 @@ void* worker(void* arg) {
         } else if (results > 0) {
             msg_enum recv = atoi(buf);
             printEnumName(recv);
-            char buf[MSG_BUFFER_SIZE];
-            sprintf(buf, "%d", (int) selectResponse(recv));
 
-            if (write(sockfd, buf, sizeof(buf)) < 0) {
+            if (write(sockfd, buf, MSG_BUFFER_SIZE) < 0) {
                 perror("Cannot write");
                 exit(1);
+            }
+
+            if (recv == TERMINATE) {
+                break;
             }
         }
 
@@ -131,18 +133,26 @@ int main(int argc, char *argv[]) {
     //     }
     // } 
 
-    while (1) {
-        // Accept the data packet from client and verification
-        connfd_arr[count % NCLIENTS] = accept(sockfd, (struct sockaddr *)&cli, &len);
-        if (connfd_arr[count % NCLIENTS] < 0) {
-            printf("Server accept failed...\n");
-            exit(0);
-        } else
-            printf("Server accept the client...\n");
+    // while (1) {
+    //     // Accept the data packet from client and verification
+    //     connfd_arr[count % NCLIENTS] = accept(sockfd, (struct sockaddr *)&cli, &len);
+    //     if (connfd_arr[count % NCLIENTS] < 0) {
+    //         printf("Server accept failed...\n");
+    //         exit(0);
+    //     } else
+    //         printf("Server accept the client...\n");
 
-        pthread_create(&tid, NULL, worker, (void *)&connfd_arr[count % NCLIENTS]);
-    }
+    //     pthread_create(&tid, NULL, worker, (void *)&connfd_arr[count % NCLIENTS]);
+    // }
 
-    // Server never shut down
-    close(sockfd);
+    connfd_arr[0] = accept(sockfd, (struct sockaddr *)&cli, &len);
+    if (connfd_arr[0] < 0) {
+        printf("Server accept failed...\n");
+        exit(0);        
+    } else
+        printf("Server accept the client...\n");
+    
+    pthread_create(&tid, NULL, worker, (void *)&connfd_arr[0]);
+
+    pthread_join(tid, NULL);
 }

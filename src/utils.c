@@ -41,6 +41,7 @@ void printEnumName(msg_enum msg) {
         case CASH:             printf("CASH : %d\n", CASH); return;
         case ERROR:            printf("ERROR : %d\n", ERROR); return;
         case REQUEST_HISTORY:  printf("REQUEST_HISTORY : %d\n", REQUEST_HISTORY); return;
+        case TERMINATE:        printf("TERMINATE : %d\n", TERMINATE); return;
         case HISTORY:          printf("HISTORY : %d\n", HISTORY);return;
     }
 }

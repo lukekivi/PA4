@@ -6,30 +6,35 @@ void printSyntax(){
 }
 
 void func(int sockfd, int msg) {
-    printf("Emitting: %d\n", msg);
-    char buf[MSG_BUFFER_SIZE];
-    sprintf(buf, "%d", (int) msg);
 
-    if (write(sockfd, buf, sizeof(buf)) < 0) {
+    char buf[MSG_BUFFER_SIZE];
+    sprintf(buf, "%d", msg);
+
+    
+    if (write(sockfd, buf, MSG_BUFFER_SIZE) < 0) {
         perror("Cannot write");
         exit(1);
     }
-
-    char recv[MSG_BUFFER_SIZE];
-    memset(recv, 0, MSG_BUFFER_SIZE);
+    
 
     while (1) {
-        int results = read(sockfd, recv, MSG_BUFFER_SIZE);
+        char rcv[MSG_BUFFER_SIZE];
+        int results = read(sockfd, rcv, MSG_BUFFER_SIZE);
         
         if (results < 0) {
             perror("cannot read");
             exit(1);
         } else if (results > 0) {
-            printf("Message received from server: %s\n", recv);
-            // printEnumName(*((msg_enum*) msg));
+            msg_enum msg = atoi(rcv);
+            printEnumName(msg);
+
+            if (msg == TERMINATE) {
+                close(sockfd);
+            }
             break;
         }
     }
+
 }
 
 int main(int argc, char *argv[]){
@@ -64,7 +69,6 @@ int main(int argc, char *argv[]){
     // Get the correct filepath
     char file[MAX_STR] = "input/";
     strcat(file, argv[1]);
-    printf("FILE: %s\n", file);
 
     // Get the server address
     char *server_addr = argv[2];
@@ -126,10 +130,9 @@ int main(int argc, char *argv[]){
 
     // free(name);
     // free(username);
-    
-    for (int i = 0; i < MSG_ENUM_SIZE; i++) {
+
+    for (int i = 0; i < MSG_ENUM_SIZE-2; i++)
         func(sockfd, i);
-    }
     
 
     end = clock();
