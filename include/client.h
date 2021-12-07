@@ -5,4 +5,6 @@
 
 void printSyntax();
 
+void func(int sockfd, int msg);
+
 #endif
