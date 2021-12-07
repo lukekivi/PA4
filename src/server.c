@@ -20,8 +20,8 @@ void printSyntax() {
 //     }
 // }
 
-void* worker(void* arg) {
-    int sockfd = *(int *) arg;
+void* worker(int sockfd) {
+    //int sockfd = *(int *) arg;
 
     // receive enumerated value from client and print it to standard output
     char recv[MAX_STR];
@@ -80,14 +80,13 @@ int main(int argc, char *argv[]) {
     bzero(&servaddr, sizeof(servaddr)); 
 
     char* server_addr = argv[1];
-    int LOCAL_PORT = atoi(server_addr);
-    char* PORT = argv[2];
+    int PORT = atoi(argv[2]);
     // int nWorkers = argv[3]; // Commented out because it's not for interim
 
     // assign IP, PORT
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(server_addr);
-    servaddr.sin_port = htons(inet_addr(PORT));
+    servaddr.sin_port = htons(PORT);
 
     // Binding newly created socket to given IP and verification
     if ((bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr))) != 0) {
@@ -106,30 +105,29 @@ int main(int argc, char *argv[]) {
         printf("Server listening..\n");
     len = sizeof(cli);
 
-    int count = 0;
-    pthread_t tid;
-    int connfd_arr[NCLIENTS];
+    // int count = 0;
+    // pthread_t tid;
+    // int connfd_arr[NCLIENTS];
 
-    // create worker threads
-    int* workerThreads[nWorkers];
-    for (int i = 0; i < nWorkers; i++) {
-        if (pthread_create(&workerThreads[i], NULL, worker, NULL) != 0) {
-            fprintf(stderr, "ERROR: Failed to start worker thread\n");
-            exit(EXIT_FAILURE);
-        }
-    } 
+    // // create worker threads
+    // int* workerThreads[nWorkers];
+    // for (int i = 0; i < nWorkers; i++) {
+    //     if (pthread_create(&workerThreads[i], NULL, worker, NULL) != 0) {
+    //         fprintf(stderr, "ERROR: Failed to start worker thread\n");
+    //         exit(EXIT_FAILURE);
+    //     }
+    // } 
 
     while (1) {
         // Accept the data packet from client and verification
-        connfd_arr[count % NCLIENTS] = accept(sockfd, (struct sockaddr *)&cli, &len);
-        if (connfd_arr[count % NCLIENTS] < 0) {
+        connfd = accept(sockfd, (struct sockaddr *)&cli, &len);
+        if (connfd < 0) {
             printf("Server accept failed...\n");
             exit(0);
         } else
             printf("Server accept the client...\n");
-
-        pthread_create(&tid, NULL, worker, (void *)&connfd_arr[count % NCLIENTS]);
     }
+    worker(connfd);
 
 
     // Server never shut down
