@@ -1,5 +1,5 @@
 # Project #4 - Network Sockets
-* Lab machine name used to test your program: 
+* Lab machine name used to test your program: csel-broccoli
 
 * Project group number, group member names and x500 addresses
 * Group #45 -
