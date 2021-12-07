@@ -34,15 +34,23 @@ void* worker(void* arg) {
     // when server receives TERMINATE, re-transmit to client, close the connection and return
     char* buf = NULL;
     while (1) {
-        buf = (char* ) malloc(sizeof(char) * MSG_ENUM_SIZE);
+        buf = (char* ) malloc(sizeof(char) * MSG_BUFFER_SIZE);
 
-        int results = read(sockfd, buf, MSG_ENUM_SIZE);
+        int results = read(sockfd, buf, MSG_BUFFER_SIZE);
 
         if (results < 0 ) {
             perror("cannot read");
             exit(1);
         } else if (results > 0) {
-            printf("Worker: %s\n", buf);
+            msg_enum recv = atoi(buf);
+            printEnumName(recv);
+            char buf[MSG_BUFFER_SIZE];
+            sprintf(buf, "%d", (int) selectResponse(recv));
+
+            if (write(sockfd, buf, sizeof(buf)) < 0) {
+                perror("Cannot write");
+                exit(1);
+            }
         }
 
         free(buf);

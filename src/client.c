@@ -7,7 +7,7 @@ void printSyntax(){
 
 void func(int sockfd, int msg) {
     printf("Emitting: %d\n", msg);
-    char buf[MSG_ENUM_SIZE];
+    char buf[MSG_BUFFER_SIZE];
     sprintf(buf, "%d", (int) msg);
 
     if (write(sockfd, buf, sizeof(buf)) < 0) {
@@ -15,14 +15,21 @@ void func(int sockfd, int msg) {
         exit(1);
     }
 
-    // char recv[MAX_ENUM_LENGTH];
-    // memset(recv, 0, MAX_ENUM_LENGTH);
-    // if (read(sockfd, recv, MAX_ENUM_LENGTH) < 0) {
-    //     perror("cannot read");
-    //     exit(1);
-    // }
-    // printf("Messaged received from server: %s\n", recv);
-    // printEnumName(*((msg_enum*) msg));
+    char recv[MSG_BUFFER_SIZE];
+    memset(recv, 0, MSG_BUFFER_SIZE);
+
+    while (1) {
+        int results = read(sockfd, recv, MSG_BUFFER_SIZE);
+        
+        if (results < 0) {
+            perror("cannot read");
+            exit(1);
+        } else if (results > 0) {
+            printf("Message received from server: %s\n", recv);
+            // printEnumName(*((msg_enum*) msg));
+            break;
+        }
+    }
 }
 
 int main(int argc, char *argv[]){

@@ -31,17 +31,17 @@ void bookeepingCode()
 
 void printEnumName(msg_enum msg) {
     switch (msg) {
-        case REGISTER:         printf("REGISTER\n"); return;
-        case GET_ACCOUNT_INFO: printf("GET_ACCOUNT_INFO\n"); return;
-        case TRANSACT:         printf("TRANSACT\n"); return;
-        case GET_BALANCE:      printf("GET_BALANCE\n"); return;
-        case ACCOUNT_INFO:     printf("ACCOUNT_INFO\n"); return;
-        case BALANCE:          printf("BALANCE\n"); return;
-        case REQUEST_CASH:     printf("REQUEST_CASH\n"); return;
-        case CASH:             printf("CASH\n"); return;
-        case ERROR:            printf("ERROR\n"); return;
-        case REQUEST_HISTORY:  printf("REQUEST_HISTORY\n"); return;
-        case HISTORY:          printf("HISTORY\n");return;
+        case REGISTER:         printf("REGISTER : %d\n", REGISTER); return;
+        case GET_ACCOUNT_INFO: printf("GET_ACCOUNT_INFO : %d\n", GET_ACCOUNT_INFO); return;
+        case TRANSACT:         printf("TRANSACT : %d\n", TRANSACT); return;
+        case GET_BALANCE:      printf("GET_BALANCE : %d\n", GET_BALANCE); return;
+        case ACCOUNT_INFO:     printf("ACCOUNT_INFO : %d\n", ACCOUNT_INFO); return;
+        case BALANCE:          printf("BALANCE : %d\n", BALANCE); return;
+        case REQUEST_CASH:     printf("REQUEST_CASH : %d\n", REQUEST_CASH); return;
+        case CASH:             printf("CASH : %d\n", CASH); return;
+        case ERROR:            printf("ERROR : %d\n", ERROR); return;
+        case REQUEST_HISTORY:  printf("REQUEST_HISTORY : %d\n", REQUEST_HISTORY); return;
+        case HISTORY:          printf("HISTORY : %d\n", HISTORY);return;
     }
 }
 

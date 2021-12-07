@@ -22,6 +22,7 @@
 #define START_CASH 10000
 #define LOGGER_SLEEP 5
 #define NCLIENTS 8
+#define MSG_BUFFER_SIZE 3
 #define MSG_ENUM_SIZE 12
 
 // number of worker threads
