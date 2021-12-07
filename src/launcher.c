@@ -5,6 +5,14 @@
 #include <sys/wait.h>
 
 int main(int argc, char *argv[]){
+    /** 
+     * args:
+     *   -   1: local address
+     *   -   2: port number
+     *   -   3: num workers
+     *   - 4+n: input files
+     */
+
 
     // fork and exec the server
     pid_t server_pid;

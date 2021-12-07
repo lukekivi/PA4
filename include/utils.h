@@ -18,10 +18,12 @@
 
 #define MAX_STR 64
 #define MAX_ACC 1023
-#define CASH_AMOUNT 100000 		// cash amount for REQUEST_CASH and CASH messages
-#define START_CASH 10000        // starting cash value for client.c
+#define CASH_AMOUNT 100000
+#define START_CASH 10000
 #define LOGGER_SLEEP 5
 #define NCLIENTS 8
+#define MSG_BUFFER_SIZE 4
+#define MSG_ENUM_SIZE 12
 
 // number of worker threads
 int nWorkers;
@@ -44,6 +46,24 @@ typedef enum {
 }msg_enum;
 
 void bookeepingCode();
+
+typedef struct {
+	char* username;
+	char* name;
+	time_t birthday;
+	int account_number;
+	float balance;
+}account_info;
+
+/**
+ *
+ */
+void printEnumName(msg_enum msg);
+
+/**
+ * 
+ */
+msg_enum selectResponse(msg_enum recv);
 
 /**
  * @brief Check if a string is composed strictly of digits

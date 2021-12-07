@@ -5,33 +5,51 @@ void printSyntax(){
     printf("usage: $ ./client input_filename server_addr server_port\n");
 }
 
-// If I understand interim correctly, we are just doing message_type for now?
-void func(int sockfd, int message_type) {
-    int ENUMLENGTH = 2; // digits 0-11, so message_type length max is 2
-    char message[ENUMLENGTH];
-    memset(message, 0, ENUMLENGTH);
-    sprintf(message, "%d", message_type);
+void func(int sockfd, int msg) {
 
-    if (write(sockfd, message, strlen(message)) < 0) {
+    char buf[MSG_BUFFER_SIZE];
+    sprintf(buf, "%d", msg);
+
+    
+    if (write(sockfd, buf, MSG_BUFFER_SIZE) < 0) {
         perror("Cannot write");
         exit(1);
     }
+    
 
-    char recv[ENUMLENGTH];
-    memset(recv, 0, ENUMLENGTH);
-    if (read(sockfd, recv, ENUMLENGTH) < 0) {
-        perror("cannot read");
-        exit(1);
+    while (1) {
+        char rcv[MSG_BUFFER_SIZE];
+        int results = read(sockfd, rcv, MSG_BUFFER_SIZE);
+        
+        if (results < 0) {
+            perror("cannot read");
+            exit(1);
+        } else if (results > 0) {
+            msg_enum msg = atoi(rcv);
+            printEnumName(msg);
+
+            if (msg == TERMINATE) {
+                close(sockfd);
+            }
+            break;
+        }
     }
-    printf("Messaged received from server: %s\n", recv);
+
 }
 
 int main(int argc, char *argv[]){
+    /**
+     * args
+     *  - 1: input file
+     *  - 2: local address
+     *  - 3: port number
+     */
+
     // Cash variable initialization
     // double cash = START_CASH;
 
     // argument handling
-    if(argc != 4) {
+    if (argc != 4) {
         printSyntax();
         return 0;
     }
@@ -47,21 +65,22 @@ int main(int argc, char *argv[]){
     }
     else
         printf("Socket successfully created..\n");
-    bzero(&servaddr, sizeof(servaddr));
 
     // Get the correct filepath
     char file[MAX_STR] = "input/";
     strcat(file, argv[1]);
-    printf("FILE: %s\n", file);
 
     // Get the server address
     char *server_addr = argv[2];
-    int intServerAddr = atoi(server_addr);
+    bzero(&servaddr, sizeof(servaddr));
 
-    // In the design document, client only has 2 arguments input_filename and server_addr
-    // At the top of this document, there is a comment with 3. For now, I will assume the
-    // document was correct in that there was 2. Obviously can be changed.
-    char *port = "0000";
+
+    int port = atoi(argv[3]);
+    
+    // assign IP, PORT
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(server_addr);
+    servaddr.sin_port = htons(port);
 
     // connect the client socket to server socket
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
@@ -76,6 +95,7 @@ int main(int argc, char *argv[]){
     clock_t begin, end;
 
     begin = clock();
+
 
     // // Variable declaration
     // int message_type, account_number, num_transactions;
@@ -110,6 +130,10 @@ int main(int argc, char *argv[]){
 
     // free(name);
     // free(username);
+
+    for (int i = 0; i < MSG_ENUM_SIZE-2; i++)
+        func(sockfd, i);
+    
 
     end = clock();
     cpu_time = (double)(end - begin) / CLOCKS_PER_SEC;
