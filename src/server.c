@@ -42,16 +42,66 @@ void* worker(void* arg) {
             perror("cannot read");
             exit(1);
         } else if (results > 0) {
-            msg_enum recv = atoi(buf);
-            printEnumName(recv);
+            msg_enum recv = atoi(buf); // get
+
+            switch (recv) {
+              case REGISTER:
+                // needs to read in a string name, string username, and long birthday
+
+                // write back BALANCE
+                break;
+              case GET_ACCOUNT_INFO:
+                // need to read in int account_number
+                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 4);
+                int account_number = atoi(buf);
+                // getAccountInfo(account_number);
+
+                // write back ACCOUNT_INFO
+                break;
+              case TRANSACT:
+                // need to read in int account_number and float amount
+                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 4);
+                int account_number = atoi(buf);
+                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 8);
+                float amount = atof(buf);
+                // transact(account_number, amount);
+
+                // write back BALANCE
+                break;
+              case GET_BALANCE:
+                // need to read in int account_number and float amount
+                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 4);
+                int account_number = atoi(buf);
+                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 8);
+                float amount = atof(buf);
+                // get_balance(account_number, amount);
+
+                // write back BALANCE
+                break;
+              case REQUEST_CASH:
+                // need to read in float amount
+                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 4);
+                float amount = atof(buf);
+                // requestCash(amount);
+
+                // write back CASH
+                break;
+              case ERROR:
+                // dont need to read in anything
+
+                break;
+              case TERMINATE:
+                // dont need to read in anything
+                break;
+              default:
+                // another error
+                fprintf(stderr, "ERROR: Bad recv argument.");
+                exit(0);
+            }
 
             if (write(sockfd, buf, MSG_BUFFER_SIZE) < 0) {
                 perror("Cannot write");
                 exit(1);
-            }
-
-            if (recv == TERMINATE) {
-                break;
             }
         }
 
@@ -94,7 +144,7 @@ int main(int argc, char *argv[]) {
     else {
         printf("Socket successfully created...\n");
     }
-    bzero(&servaddr, sizeof(servaddr)); 
+    bzero(&servaddr, sizeof(servaddr));
 
     // int nWorkers = argv[3]; // Commented out because it's not for interim
 
@@ -131,7 +181,7 @@ int main(int argc, char *argv[]) {
     //         fprintf(stderr, "ERROR: Failed to start worker thread\n");
     //         exit(EXIT_FAILURE);
     //     }
-    // } 
+    // }
 
     // while (1) {
     //     // Accept the data packet from client and verification
@@ -148,10 +198,10 @@ int main(int argc, char *argv[]) {
     connfd_arr[0] = accept(sockfd, (struct sockaddr *)&cli, &len);
     if (connfd_arr[0] < 0) {
         printf("Server accept failed...\n");
-        exit(0);        
+        exit(0);
     } else
         printf("Server accept the client...\n");
-    
+
     pthread_create(&tid, NULL, worker, (void *)&connfd_arr[0]);
 
     pthread_join(tid, NULL);
