@@ -183,26 +183,15 @@ int main(int argc, char *argv[]) {
     //     }
     // }
 
-    // while (1) {
-    //     // Accept the data packet from client and verification
-    //     connfd_arr[count % NCLIENTS] = accept(sockfd, (struct sockaddr *)&cli, &len);
-    //     if (connfd_arr[count % NCLIENTS] < 0) {
-    //         printf("Server accept failed...\n");
-    //         exit(0);
-    //     } else
-    //         printf("Server accept the client...\n");
+    while (1) {
+         // Accept the data packet from client and verification
+        connfd_arr[count % NCLIENTS] = accept(sockfd, (struct sockaddr *)&cli, &len);
+        if (connfd_arr[count % NCLIENTS] < 0) {
+            printf("Server accept failed...\n");
+            exit(0);
+        } else
+            printf("Server accept the client...\n");
 
-    //     pthread_create(&tid, NULL, worker, (void *)&connfd_arr[count % NCLIENTS]);
-    // }
-
-    connfd_arr[0] = accept(sockfd, (struct sockaddr *)&cli, &len);
-    if (connfd_arr[0] < 0) {
-        printf("Server accept failed...\n");
-        exit(0);
-    } else
-        printf("Server accept the client...\n");
-
-    pthread_create(&tid, NULL, worker, (void *)&connfd_arr[0]);
-
-    pthread_join(tid, NULL);
+        pthread_create(&tid, NULL, worker, (void *)&connfd_arr[count % NCLIENTS]);
+    }
 }
