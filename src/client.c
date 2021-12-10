@@ -5,33 +5,50 @@ void printSyntax(){
     printf("usage: $ ./client input_filename server_addr server_port\n");
 }
 
-void func(int sockfd, int msg) {
+void func(int sockfd, int message_type, int account_number, char* name, char* username, long birthday, float amount, int num_transactions) {
 
     char buf[MSG_BUFFER_SIZE];
     sprintf(buf, "%d", msg);
 
-    
+
     if (write(sockfd, buf, MSG_BUFFER_SIZE) < 0) {
         perror("Cannot write");
         exit(1);
     }
-    
+
 
     while (1) {
         char rcv[MSG_BUFFER_SIZE];
         int results = read(sockfd, rcv, MSG_BUFFER_SIZE);
-        
+
         if (results < 0) {
             perror("cannot read");
             exit(1);
         } else if (results > 0) {
             msg_enum msg = atoi(rcv);
-            printEnumName(msg);
 
-            if (msg == TERMINATE) {
-                close(sockfd);
+            switch (msg) {
+              case ACCOUNT_INFO:
+                // need to read in string username, string name, and long birthday
+
+                break;
+              case BALANCE:
+                  // need to read in int account_number and float balance
+                  results = pread(sockfd, rcv, MSG_BUFFER_SIZE, 4);
+                  int account_number = atoi(rcv);
+                  results = pread(sockfd, rcv, MSG_BUFFER_SIZE, 8);
+                  float amount = atof(rcv);
+                  // balance(account_number, amount);
+
+                  break;
+              case CASH:
+                    // need to read in float cash
+                    results = pread(sockfd, rcv, MSG_BUFFER_SIZE, 4);
+                    float amount = atof(rcv);
+                    // cash(amount);
+
+                    break;
             }
-            break;
         }
     }
 
@@ -76,7 +93,7 @@ int main(int argc, char *argv[]){
 
 
     int port = atoi(argv[3]);
-    
+
     // assign IP, PORT
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(server_addr);
@@ -133,12 +150,11 @@ int main(int argc, char *argv[]){
 
     for (int i = 0; i < MSG_ENUM_SIZE-2; i++)
         func(sockfd, i);
-    
+
 
     end = clock();
     cpu_time = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Elapsed Time: %.2f\n", cpu_time);
 
-    return 0; 
+    return 0;
 }
-
