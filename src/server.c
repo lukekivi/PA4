@@ -1,4 +1,70 @@
 #include "server.h"
+#define STARTING_TRANSACTION_SIZE 50
+
+struct account* balances[MAX_ACC];
+int numAccounts = 0;
+
+// shared queue of nodes containing sockfds
+struct Queue* q;
+
+// sempahores 
+sem_t mutexBalances[acctsNum];
+sem_t mutexQueue;             
+sem_t staged; 
+
+void initBalances() {
+    balances = (struct account **) malloc(sizeof(struct account*) * MAX_ACC);
+
+    for (int i = 0; i < STARTING_TRANSACTION_SIZE; i++) {
+        balances[i] = NULL;
+    }
+}
+
+void registerAccount(char* username, char* name, time_t birthday) {
+    struct account* newAccount = (struct account*) malloc(sizeof(struct account) * STARTING_TRANSACTION_SIZE);
+    account->username = username;
+    account->name = name;
+    account->birthday = birthday;
+    account->balance = 0.0;
+    account->transactions = (float*) malloc(sizeof(float));
+    account->numTransactions = 0;
+    account->transctionSize = STARTING_TRANSACTION_SIZE;
+
+    balances[numAccounts] = account;
+    numAccounts += 1;
+}
+
+int addTransaction(int accountNumber, float transaction) {
+    if (balances[accountNumber] == NULL) {
+        return 0;
+    } else if (balances[accountNumber]->balance + transaction < 0) {
+        return -1;
+    } else if (balances[accountNumber]->numTransactions == balances[accountNumber]->transactionSize) {
+        balances[accountNumber]->transactions = 
+            (float *) realloc(balances[accountNumber]->transctions, sizeof(float) * 2 * balances[accountNumber]->transactionSize);
+        balances[accountNumber]->tansactionSize *= 2;
+
+        balances[accountNumber]->transactions[numTransactions] = transaction;
+        balances[accountNumber]->numTransactions += 1;
+        balances[accountNumber]->balance += transaction;
+    }
+}
+
+
+ void freeBalances() {
+     for (int i = 0; i < numAccounts; i++) {
+         free(balances[i]->username);
+         free(balances[i]->name);
+         free(balances[i]->transactions);
+         balances[i]->username = NULL;
+         balances[i]->name = NULL;
+         balances[i]->transactions = NULL;
+         free(balances[i]);
+         balances[i] = NULL;
+     }
+
+     free(balances);
+ }
 
 
 void printSyntax() {
@@ -7,18 +73,18 @@ void printSyntax() {
 }
 
 // Commented out because it's not for interim
-// void log() {
-//     // Get the correct filepath
-//     char file[MAX_STR] = "output/";
-//     printf("FILE: %s\n", file);
+void log() {
+    // Get the correct filepath
+    char file[MAX_STR] = "output/";
+    printf("FILE: %s\n", file);
 
-//     sleep(LOGGER_SLEEP);
-//     FILE *fp = fopen(file, "w");
-//     if (fp == NULL) {
-//         fprintf(stderr, "ERROR: failed to open file %s\n", file);
-//         exit(EXIT_FAILURE);
-//     }
-// }
+    sleep(LOGGER_SLEEP);
+    FILE *fp = fopen(file, "w");
+    if (fp == NULL) {
+        fprintf(stderr, "ERROR: failed to open file %s\n", file);
+        exit(EXIT_FAILURE);
+    }
+}
 
 void* worker(void* arg) {
      /**
@@ -52,7 +118,7 @@ void* worker(void* arg) {
                 break;
               case GET_ACCOUNT_INFO:
                 // need to read in int account_number
-                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 4);
+                results = read(sockfd, buf, MSG_BUFFER_SIZE, 4);
                 int account_number = atoi(buf);
                 // getAccountInfo(account_number);
 
@@ -60,9 +126,9 @@ void* worker(void* arg) {
                 break;
               case TRANSACT:
                 // need to read in int account_number and float amount
-                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 4);
+                results = read(sockfd, buf, MSG_BUFFER_SIZE, 4);
                 int account_number = atoi(buf);
-                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 8);
+                results = read(sockfd, buf, MSG_BUFFER_SIZE, 8);
                 float amount = atof(buf);
                 // transact(account_number, amount);
 
@@ -70,9 +136,9 @@ void* worker(void* arg) {
                 break;
               case GET_BALANCE:
                 // need to read in int account_number and float amount
-                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 4);
+                results = read(sockfd, buf, MSG_BUFFER_SIZE, 4);
                 int account_number = atoi(buf);
-                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 8);
+                results = read(sockfd, buf, MSG_BUFFER_SIZE, 8);
                 float amount = atof(buf);
                 // get_balance(account_number, amount);
 
@@ -80,7 +146,7 @@ void* worker(void* arg) {
                 break;
               case REQUEST_CASH:
                 // need to read in float amount
-                results = pread(sockfd, buf, MSG_BUFFER_SIZE, 4);
+                results = read(sockfd, buf, MSG_BUFFER_SIZE, 4);
                 float amount = atof(buf);
                 // requestCash(amount);
 
@@ -114,9 +180,6 @@ void* worker(void* arg) {
 
 int main(int argc, char *argv[]) {
 
-    int sockfd, len, connfd;
-    struct sockaddr_in servaddr, cli;
-
     // argument handling
     if (argc != 4) {
         printSyntax();
@@ -126,14 +189,13 @@ int main(int argc, char *argv[]) {
     // create empty output folder
     bookeepingCode();
 
-    // Commented out because it's not for interim
-    // // Start log thead
-    // pthread_t logThread;
+    // Start log thead
+    pthread_t logThread;
 
-    // if (pthread_create(&logThread, NULL, log, NULL) != 0) {
-    //      fprintf(stderr, "ERROR: Failed to start log thread\n");
-    //      exit(EXIT_FAILURE);
-    // }
+    if (pthread_create(&logThread, NULL, log, NULL) != 0) {
+         fprintf(stderr, "ERROR: Failed to start log thread\n");
+         exit(EXIT_FAILURE);
+    }
 
     // create socket
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -146,7 +208,20 @@ int main(int argc, char *argv[]) {
     }
     bzero(&servaddr, sizeof(servaddr));
 
-    // int nWorkers = argv[3]; // Commented out because it's not for interim
+    int nWorkers = argv[3]; 
+
+    int sockfd, len, connfd;
+    struct sockaddr_in servaddr, cli;     
+
+    q = initQueue();
+
+    initBalances();
+
+    for (int i = 0; i < acctsNum; i++) {
+        sem_init(&mutexBalances[i], 0, 1);
+    }
+    sem_init(&mutexQueue, 0, 1);
+    sem_init(&staged, 0, 0);
 
     // assign IP, PORT
     servaddr.sin_family = AF_INET;
@@ -175,13 +250,13 @@ int main(int argc, char *argv[]) {
     int connfd_arr[NCLIENTS];
 
     // create worker threads
-    // int* workerThreads[nWorkers];
-    // for (int i = 0; i < nWorkers; i++) {
-    //     if (pthread_create(&workerThreads[i], NULL, worker, NULL) != 0) {
-    //         fprintf(stderr, "ERROR: Failed to start worker thread\n");
-    //         exit(EXIT_FAILURE);
-    //     }
-    // }
+    int* workerThreads[nWorkers];
+    for (int i = 0; i < nWorkers; i++) {
+        if (pthread_create(&workerThreads[i], NULL, worker, NULL) != 0) {
+            fprintf(stderr, "ERROR: Failed to start worker thread\n");
+            exit(EXIT_FAILURE);
+        }
+    }
 
     while (1) {
          // Accept the data packet from client and verification

@@ -25,9 +25,6 @@
 #define MSG_BUFFER_SIZE 4
 #define MSG_ENUM_SIZE 12
 
-// number of worker threads
-int nWorkers;
-
 /*  DO NOT MODIFY */
 typedef enum {
 	REGISTER,
@@ -47,30 +44,98 @@ typedef enum {
 
 void bookeepingCode();
 
-typedef struct {
+// Struct to hold account information
+struct account {
 	char* username;
 	char* name;
 	time_t birthday;
-	int account_number;
 	float balance;
-}account_info;
+    float* transactions;
+	int numTransactions;
+    int transactionsSize;
+};
 
 /**
- *
- */
-void printEnumName(msg_enum msg);
-
-/**
- * 
+ * Selects the response enum. For use in server. If the enum doesn't have a response it triggers 
+ * an error and exits
+ * @param recv received enum
+ * @return     the correct response enum
  */
 msg_enum selectResponse(msg_enum recv);
 
+/**** Queue Code ****/
+
 /**
- * @brief Check if a string is composed strictly of digits
+ * Node for shared queue linked list
+ * @param next   pointer to the next node in the linked list
+ * @param sockfd fd for socket
+ */
+struct Node {
+    struct Node* next;
+    int sockfd;
+};
+
+/** Queue Stuff **/
+
+/**
+ * Queue for nodes that carry packets
+ * @param tail where nodes are dequeued
+ * @param head dummy node. Head->next is what is dequeued.
+ */
+struct Queue {
+    struct Node* head;
+    struct Node* tail;
+};
+
+/**
+ * Initialize a queue
+ * @returns a pointer to an initialized queue
+ */
+struct Queue* initQueue();
+
+/**
+ * Allocate space for a node and set its fields
+ * @param sockfd the socket fd
+ * @returns      pointer to the malloc'd node
+ */
+ struct Node* initNode(int sockfd);
+
+/**
+ * Add node to a queue. If the queue is empty to start, tail should be a node with it's fields set to NULL.
+ * @param q    the queue
+ * @param node node to be added. node->next should be NULL
+ */
+void enqueue(struct Queue* q, struct Node* node);
+
+/**
+ * Pop the head node off of the queue
+ * @param q    the queue
+ * @returns    popped node or NULL if queue is empty
+ */
+struct Node* dequeue(struct Queue* q);
+
+/**
+ * Deallocate a node
+ * @param node the node to free
+ */
+void freeNode(struct Node* node);
+
+/**
+ * Free entire queue
+ * @param q    the queue
+ */
+void freeQueue(struct Queue* q);
+
+/**
+ * Check if a string is composed strictly of digits
  * @param str a string
  * @return -1 if a non-digit character was found, 1 if str is composed of digits
  */
 int isDigits(char* str);
+
+/**** Debugging Functions ****/
+
+void printEnumName(msg_enum msg);
 
 #endif
 
