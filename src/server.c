@@ -154,7 +154,6 @@ void* worker(void* arg) {
         sem_wait(&mutexQueue);
         int sockfd = dequeue(q);
         sem_post(&mutexQueue);
-        printf("Dequeued %d\n", sockfd);
 
         if (sockfd < 0) {
             perror("tried to dequeue from an empty queue");
@@ -169,9 +168,6 @@ void* worker(void* arg) {
             int results = read(sockfd, &temp, sizeof(int));
             msg_enum recv = ntohl(temp);
 
-            printf("server: %d\n", recv);
-            printEnumName(recv);
-
             int account_number;
             float amount;
 
@@ -182,6 +178,13 @@ void* worker(void* arg) {
 
                 if (recv == TERMINATE) {
                     printf("BREAK\n");
+                    int response = htonl(recv);
+
+                    if (write(sockfd, &response, sizeof(int)) < 0) {
+                        perror("Cannot write");
+                        exit(1);
+                    }
+
                     break;
                 }
 
@@ -368,7 +371,6 @@ int main(int argc, char *argv[]) {
             sem_post(&mutexQueue);
         
             sem_post(&staged);
-            printf("Enqueued %d\n", newSockfd);
         }
     }
 }

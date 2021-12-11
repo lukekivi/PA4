@@ -7,7 +7,7 @@ void printSyntax(){
 
 void func(int sockfd, int msg) {
     int convMsg = htonl(msg);
-    
+
     if (write(sockfd, &convMsg, sizeof(int)) < 0) {
         perror("Cannot write");
         exit(1);
