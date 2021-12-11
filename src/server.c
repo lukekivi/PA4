@@ -21,39 +21,34 @@ void initBalances() {
     }
 }
 
-
-// Returns 1 if the username is already registered in balances, and 0 otherwise
-int isUsernameInBalances(char* username) {
-    sem_wait(&numAccountsMutex);
-    for (int i = 0; i < numAccounts; i++) {
-        if (balances[i]->username == username) {
-            perror("ERROR: account already exists.");
-            return 0;
-        }
-    }
-    return 1;
-}
-
-// return 1 for success, -1 for error
+// return the account number for success, -1 for error
 int registerAccount(int sockfd) {
     char* username;
 
     if ((username = readStringFromSocket(sockfd)) == NULL) {
+        perror("ERROR: failure to write to sockfd\n");
         return -1;
     }
-
-    if (isUsernameInBalances(username) == 0) {
-        return -1;
-    } 
 
     char* name;
 
     if ((name = readStringFromSocket(sockfd)) == NULL) {
+        perror("ERROR: failure to write to sockfd\n");
         return -1;
     }
 
     time_t birthday;
-    // TODO: HOW???
+    
+    while (1) {
+        int results = read(sockfd, &birthday, sizeof(time_t));
+
+        if (results < 0) {
+            perror("ERROR: failure to read from sockfd\n");
+            return -1;
+        } else if (results > 0) {
+            break;
+        }
+    }
 
     struct account* acc = (struct account*) malloc(sizeof(struct account) * STARTING_TRANSACTIONS_SIZE);
     acc->username = username;
@@ -65,10 +60,37 @@ int registerAccount(int sockfd) {
     acc->transactionsSize = STARTING_TRANSACTIONS_SIZE;
 
     balances[numAccounts] = acc;
+    int accountNumber = numAccounts;
     numAccounts += 1;
     sem_post(&numAccountsMutex);
 
-    return 0;
+    return accountNumber;
+}
+
+// return 1 for success, 0 for error
+int writeBackRegister(int sockfd, int accountNumber) {
+    msg_enum response = htonl(BALANCE);
+
+    if (write(sockfd, &response, sizeof(msg_enum)) < 0) {
+        perror("ERROR: Cannot write\n");
+        return 0;
+    }
+
+    int accNum = htonl(accountNumber);
+
+    if (write(sockfd, &accNum, sizeof(int)) < 0) {
+        perror("ERROR: Cannot write\n");
+        return 0;
+    }
+
+    float balance = 0.0;
+
+    if (write(sockfd, &balance, sizeof(float)) < 0) {
+        perror("ERROR: Cannot write\n");
+        return 0;
+    }
+
+    return 1;
 }
 
 
@@ -120,15 +142,17 @@ void printSyntax() {
 
 
 void* writeLog() {
+    printf("Logging started\n");
     char file[MAX_STR] = "output/balances.csv";
-    FILE *fp = fopen(file, "w");
-    if (fp == NULL) {
-        fprintf(stderr, "ERROR: failed to open file %s\n", file);
-        exit(EXIT_FAILURE);            
-    }
 
+    int i = 0;
     while(1) {
-        sleep(LOGGER_SLEEP);
+        FILE *fp = fopen(file, "w");
+        if (fp == NULL) {
+            fprintf(stderr, "ERROR: failed to open file %s\n", file);
+            exit(EXIT_FAILURE);            
+        }
+
         sem_wait(&numAccountsMutex);
         int curNumAccounts = numAccounts;
         sem_post(&numAccountsMutex);
@@ -139,7 +163,10 @@ void* writeLog() {
             fprintf(fp, "%d,%.2f,%s,%s,%ld\n", i, acc->balance, acc->name, acc->username,acc->birthday);
             sem_post(&mutexBalances[i]);
         }
+        fclose(fp);
+        sleep(LOGGER_SLEEP);
     }
+
 }
 
 
@@ -159,9 +186,6 @@ void* worker(void* arg) {
             perror("tried to dequeue from an empty queue");
             exit(1);
         }
-
-
-        // when server receives TERMINATE, re-transmit to client, close the connection and wait
         
         while (1) {
             int temp;
@@ -172,28 +196,36 @@ void* worker(void* arg) {
             float amount;
 
             if (results < 0 ) {
-                perror("cannot read");
+                perror("ERROR: Cannot read\n");
                 exit(1);
             } else if (results > 0) {
 
+                // when TERMINATE is received, re-transmit to client, close the connection and wait
                 if (recv == TERMINATE) {
                     printf("BREAK\n");
                     int response = htonl(recv);
 
                     if (write(sockfd, &response, sizeof(int)) < 0) {
-                        perror("Cannot write");
+                        perror("ERROR: Cannot write\n");
                         exit(1);
                     }
-
                     break;
                 }
-
+                printf("Recv: %d, Results: %d\n", recv, results);
                 switch (recv) {
                     case REGISTER:
                         printf("REGISTER\n");
-                        registerAccount(sockfd);
-
-                        // write back BALANCE
+                        int accountNumber = registerAccount(sockfd);
+                        if (accountNumber < 0) {
+                            freeBalances();
+                            exit(EXIT_FAILURE);
+                        }
+                        
+                        if (writeBackRegister(sockfd, accountNumber) == 0) {
+                            freeBalances();
+                            exit(EXIT_FAILURE);
+                        }
+                        printf("Success\n");
                         break;
                     case GET_ACCOUNT_INFO:
                         // // need to read in int account_number

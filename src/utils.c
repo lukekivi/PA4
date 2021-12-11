@@ -41,26 +41,48 @@ msg_enum selectResponse(msg_enum recv) {
     }
 }
 
-// reads string from the socket and returns it or null for an error val
-char* readStringFromSocket(int sockfd) {
+// writes a string length and then the string itself to the socket fd
+int writeStringToSocket(int sockfd, char* str) {
+    int len = strlen(str) + 1; // +1 for the null terminator
     int results;
 
-    int strSize;
+    int nLen = htonl(len);
+
+    if (write(sockfd, &nLen, sizeof(int)) < 0) {
+        perror("ERROR: failed write to sockfd\n");
+        return 0;
+    }
+
+    if (write(sockfd, str, len) < 0) {
+        perror("ERROR: failed write to sockfd\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+
+// reads string from the socket and returns it or null for an error val
+char* readStringFromSocket(int sockfd) {
+    int results = 0;
+    int strSize = 0;
     char* str;
 
-    while (0) {
+    while (1) {
         results = read(sockfd, &strSize, sizeof(int));
         if(results < 0) {
             perror("ERROR: failed to read");
             return NULL;
         } else if (results > 0) {
             break;
-        }
+        } 
     }
+
+    strSize = ntohl(strSize);
 
     str = (char*) malloc(sizeof(char) * strSize);
 
-    while (0) {
+    while (1) {
         results = read(sockfd, str, strSize);
         if(results < 0) {
             perror("ERROR: failed to read");

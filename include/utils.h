@@ -65,6 +65,14 @@ struct account {
 msg_enum selectResponse(msg_enum recv);
 
 /**
+ * Write a string length and then the string itself to sockfd
+ * @param sockfd the socket file descriptor to read from
+ * @param str    the string to be written
+ * @return 1 for success, 0 for failure
+ */
+ int writeStringToSocket(int sockfd, char* str);
+
+/**
  * Read a string size, allocate space for it, and then the string and return it.
  * @param sockfd the socket file descriptor to read from
  * @return a pointer to a character array, or NULL for an error value

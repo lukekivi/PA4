@@ -27,12 +27,91 @@ void func(int sockfd, int msg) {
             printEnumName(msg);
             if (msg == TERMINATE) {
                 close(sockfd);
+                exit(EXIT_SUCCESS);
             }
             break;
         }
     }
-
 }
+
+void funcRegister(int sockfd) {
+    int convMsg = htonl(REGISTER);
+
+    if (write(sockfd, &convMsg, sizeof(int)) < 0) {
+        perror("Cannot write");
+        exit(1);
+    }
+
+    char* name = "Lucas Kivi";
+    char* username = "kivix019";
+    time_t birthday = 753131776;
+
+    if (writeStringToSocket(sockfd, username) == 0) {
+        exit(1);
+    }
+    
+    if (writeStringToSocket(sockfd, name) == 0) {
+        exit(1);
+    }
+
+    if (write(sockfd, &birthday, sizeof(time_t)) < 0) {
+        perror("Cannot write");
+        exit(1);
+    }
+    
+    while (1) {
+        msg_enum temp;
+        int results = read(sockfd, &temp, sizeof(msg_enum));
+        
+        if (results < 0) {
+            perror("ERROR: failed to read from sockfd\n");
+            exit(EXIT_FAILURE);
+        } else if (results > 0) {
+            
+            msg_enum msg = ntohl(temp);;
+            
+            if (msg != BALANCE) {
+                perror("ERROR: failed to follow protocol\n");
+                exit(EXIT_FAILURE);
+            } else {
+                printEnumName(msg);
+                break;
+            }
+        }
+    }
+
+    while (1) {
+        int temp;
+        int results = read(sockfd, &temp, sizeof(int));
+        
+        if (results < 0) {
+            perror("ERROR: failed to read from sockfd\n");
+            exit(EXIT_FAILURE);
+        } else if (results > 0) {
+            
+            int accountNumber = ntohl(temp);;
+            
+            printf("Account Number: %d\n", accountNumber);
+            break;
+        }
+    }
+
+    while (1) {
+        float balance;
+        int results = read(sockfd, &balance, sizeof(float));
+        
+        if (results < 0) {
+            perror("ERROR: failed to read from sockfd\n");
+            exit(EXIT_FAILURE);
+        } else if (results > 0) {        
+            printf("Balance: %.2f\n", balance);
+            break;
+        }
+    }
+}
+
+
+
 
 int main(int argc, char *argv[]){
     /**
@@ -94,15 +173,16 @@ int main(int argc, char *argv[]){
     begin = clock();
 
 
-    func(sockfd, REGISTER);
-    func(sockfd, GET_ACCOUNT_INFO);
-    func(sockfd, TRANSACT);
-    func(sockfd, REGISTER);
-    func(sockfd, GET_BALANCE);
-    func(sockfd, REQUEST_CASH);
-    func(sockfd, REQUEST_HISTORY);
+    funcRegister(sockfd);
+    // func(sockfd, GET_ACCOUNT_INFO);
+    // func(sockfd, TRANSACT);
+    // func(sockfd, REGISTER);
+    // func(sockfd, GET_BALANCE);
+    // func(sockfd, REQUEST_CASH);
+    // func(sockfd, REQUEST_HISTORY);
     func(sockfd, TERMINATE);
     
+    close(sockfd);
 
     end = clock();
     cpu_time = (double)(end - begin) / CLOCKS_PER_SEC;

@@ -23,9 +23,17 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
 /**
  * Handle reading in after REGISTER is received
  * @param sockfd
- * @return 1 for success, -1 for error
+ * @return account number for success, -1 for failure
  */
  int registerAccount(int sockfd);
+
+/**
+ * Write response to REGISTER back to client
+ * @param sockfd
+ * @param accountNumber
+ * @return 1 for success, 0 for failure
+ */
+ int writeBackRegister(int sockfd, int accountNumber);
 
 /**
  * Update account with transaction data
