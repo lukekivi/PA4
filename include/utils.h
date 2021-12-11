@@ -15,6 +15,8 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <semaphore.h>
+
 
 #define MAX_STR 64
 #define MAX_ACC 1023
@@ -22,7 +24,6 @@
 #define START_CASH 10000
 #define LOGGER_SLEEP 5
 #define NCLIENTS 8
-#define MSG_BUFFER_SIZE 4
 #define MSG_ENUM_SIZE 12
 
 /*  DO NOT MODIFY */
@@ -62,6 +63,13 @@ struct account {
  * @return     the correct response enum
  */
 msg_enum selectResponse(msg_enum recv);
+
+/**
+ * Read a string size, allocate space for it, and then the string and return it.
+ * @param sockfd the socket file descriptor to read from
+ * @return a pointer to a character array, or NULL for an error value
+ */
+ char* readStringFromSocket(int sockfd);
 
 /**** Queue Code ****/
 
@@ -110,9 +118,9 @@ void enqueue(struct Queue* q, struct Node* node);
 /**
  * Pop the head node off of the queue
  * @param q    the queue
- * @returns    popped node or NULL if queue is empty
+ * @returns    the sockfd from popped node, -1 if error
  */
-struct Node* dequeue(struct Queue* q);
+int dequeue(struct Queue* q);
 
 /**
  * Deallocate a node
@@ -125,13 +133,6 @@ void freeNode(struct Node* node);
  * @param q    the queue
  */
 void freeQueue(struct Queue* q);
-
-/**
- * Check if a string is composed strictly of digits
- * @param str a string
- * @return -1 if a non-digit character was found, 1 if str is composed of digits
- */
-int isDigits(char* str);
 
 /**** Debugging Functions ****/
 

@@ -6,7 +6,7 @@
 void printSyntax();
 
 // array of structs to store account information
-extern struct account* balances[MAX_ACC];
+extern struct account** balances;
 
 // how many active accounts in balances
 extern int numAccounts;
@@ -15,17 +15,17 @@ extern int numAccounts;
 extern struct Queue* q;
 
 // sempahores 
-extern sem_t mutexBalances[MAX_ACC];         // Balance is being modified    
-extern sem_t mutexQueue;			         // Queue is being modified
-extern sem_t staged;			             // A producer signals when a package was staged in the queue
+extern sem_t mutexBalances[MAX_ACC];        // Balance is being modified    
+extern sem_t mutexQueue;			              // Queue is being modified
+extern sem_t staged;			                  // A producer signals when a package was staged in the queue
+extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
 
 /**
- * Sets up an account and adds it to the global array balances.
- * @param username      
- * @param name
- * @param birthday
+ * Handle reading in after REGISTER is received
+ * @param sockfd
+ * @return 1 for success, -1 for error
  */
-void registerAccount(char* username, char* name, time_t birthday);
+ int registerAccount(int sockfd);
 
 /**
  * Update account with transaction data

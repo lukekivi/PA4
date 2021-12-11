@@ -31,7 +31,7 @@ void bookeepingCode()
 
 msg_enum selectResponse(msg_enum recv) {
     switch (recv) {
-        case REGISTER:         return ACCOUNT_INFO;
+        case REGISTER:         return BALANCE;
         case GET_ACCOUNT_INFO: return ACCOUNT_INFO;
         case TRANSACT:         return BALANCE;
         case GET_BALANCE:      return BALANCE;
@@ -39,6 +39,39 @@ msg_enum selectResponse(msg_enum recv) {
         case REQUEST_HISTORY:  return HISTORY;
         default: fprintf(stderr, "ERROR: Bad recv argument."); exit(0);
     }
+}
+
+// reads string from the socket and returns it or null for an error val
+char* readStringFromSocket(int sockfd) {
+    int results;
+
+    int strSize;
+    char* str;
+
+    while (0) {
+        results = read(sockfd, &strSize, sizeof(int));
+        if(results < 0) {
+            perror("ERROR: failed to read");
+            return NULL;
+        } else if (results > 0) {
+            break;
+        }
+    }
+
+    str = (char*) malloc(sizeof(char) * strSize);
+
+    while (0) {
+        results = read(sockfd, str, strSize);
+        if(results < 0) {
+            perror("ERROR: failed to read");
+            free(str);
+            return NULL;
+        } else if (results > 0) {
+            break;
+        }
+    }
+
+    return str;
 }
 
 /* Return a pointer to an initialized queue */
@@ -76,11 +109,11 @@ void enqueue(struct Queue* q, struct Node* node) {
     }
 }
 
-/* Pop node from queue */
-struct Node* dequeue(struct Queue* q) {
+/* Pop node from queue - just returns the sockfd */
+int dequeue(struct Queue* q) {
     if (q->head->next == NULL) {
         // q is empty
-        return NULL;
+        return -1;
     }
 
     struct Node *temp = q->head->next;
@@ -92,7 +125,10 @@ struct Node* dequeue(struct Queue* q) {
     q->head->next = q->head->next->next;
     temp->next = NULL;
 
-    return temp;
+    int sockfd = temp->sockfd;
+    freeNode(temp);
+
+    return sockfd;
 }
 
 /* Deallocate a node */
@@ -117,20 +153,6 @@ void freeQueue(struct Queue* q) {
     q->tail = NULL;
 
     free(q);
-}
-
-
-/* Check a string to see if it is strictly composed of digits */
-int isDigits(char* str) {
-    int len = strlen(str);
-
-    for (int i = 0; i < len; i++) {
-        if (str[i] < '0' || str[i] > '9') {
-            return -1;
-        }
-    }
-
-    return 1;
 }
 
 void printEnumName(msg_enum msg) {
