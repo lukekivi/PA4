@@ -59,55 +59,40 @@ void funcRegister(int sockfd) {
         exit(1);
     }
     
-    while (1) {
-        msg_enum temp;
-        int results = read(sockfd, &temp, sizeof(msg_enum));
+    msg_enum tempMsg;
         
-        if (results < 0) {
-            perror("ERROR: failed to read from sockfd\n");
-            exit(EXIT_FAILURE);
-        } else if (results > 0) {
+    if (read(sockfd, &tempMsg, sizeof(msg_enum)) < 0) {
+        perror("ERROR: failed to read from sockfd\n");
+        exit(EXIT_FAILURE);
+    }
             
-            msg_enum msg = ntohl(temp);;
+    msg_enum msg = ntohl(tempMsg);;
             
-            if (msg != BALANCE) {
-                perror("ERROR: failed to follow protocol\n");
-                exit(EXIT_FAILURE);
-            } else {
-                printEnumName(msg);
-                break;
-            }
-        }
+    if (msg != BALANCE) {
+        perror("ERROR: failed to follow protocol\n");
+        exit(EXIT_FAILURE);
+    } else {
+        printEnumName(msg);
     }
 
-    while (1) {
-        int temp;
-        int results = read(sockfd, &temp, sizeof(int));
+    int tempAccountNumber;
         
-        if (results < 0) {
-            perror("ERROR: failed to read from sockfd\n");
-            exit(EXIT_FAILURE);
-        } else if (results > 0) {
+    if (read(sockfd, &tempAccountNumber, sizeof(int)) < 0) {
+        perror("ERROR: failed to read from sockfd\n");
+        exit(EXIT_FAILURE);
+    } 
             
-            int accountNumber = ntohl(temp);;
-            
-            printf("Account Number: %d\n", accountNumber);
-            break;
-        }
-    }
+    int accountNumber = ntohl(tempAccountNumber);           
+    printf("Account Number: %d\n", accountNumber);
 
-    while (1) {
-        float balance;
-        int results = read(sockfd, &balance, sizeof(float));
-        
-        if (results < 0) {
-            perror("ERROR: failed to read from sockfd\n");
-            exit(EXIT_FAILURE);
-        } else if (results > 0) {        
-            printf("Balance: %.2f\n", balance);
-            break;
-        }
+    float balance;        
+
+    if (read(sockfd, &balance, sizeof(float)) < 0) {
+        perror("ERROR: failed to read from sockfd\n");
+        exit(EXIT_FAILURE);
     }
+    
+    printf("Balance: %.2f\n", balance);
 }
 
 

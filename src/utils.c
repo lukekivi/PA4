@@ -64,35 +64,24 @@ int writeStringToSocket(int sockfd, char* str) {
 
 // reads string from the socket and returns it or null for an error val
 char* readStringFromSocket(int sockfd) {
-    int results = 0;
     int strSize = 0;
     char* str;
 
-    while (1) {
-        results = read(sockfd, &strSize, sizeof(int));
-        if(results < 0) {
-            perror("ERROR: failed to read");
-            return NULL;
-        } else if (results > 0) {
-            break;
-        } 
-    }
+    if(read(sockfd, &strSize, sizeof(int)) < 0) {
+        perror("ERROR: failed to read");
+        return NULL;
+    } 
 
     strSize = ntohl(strSize);
-
     str = (char*) malloc(sizeof(char) * strSize);
 
-    while (1) {
-        results = read(sockfd, str, strSize);
-        if(results < 0) {
-            perror("ERROR: failed to read");
-            free(str);
-            return NULL;
-        } else if (results > 0) {
-            break;
-        }
+        
+    if(read(sockfd, str, strSize) < 0) {
+        perror("ERROR: failed to read");
+        free(str);
+        return NULL;        
     }
-
+    
     return str;
 }
 
