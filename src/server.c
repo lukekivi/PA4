@@ -22,7 +22,7 @@ void initBalances() {
 }
 
 // return the account number for success, -1 for error
-int registerAccount(int sockfd) {
+int handleRegister(int sockfd) {
     char* username;
 
     if ((username = readStringFromSocket(sockfd)) == NULL) {
@@ -63,7 +63,7 @@ int registerAccount(int sockfd) {
 }
 
 // return 1 for success, 0 for error
-int writeBackRegister(int sockfd, int accountNumber) {
+int respondRegister(int sockfd, int accountNumber) {
     msg_enum response = htonl(BALANCE);
 
     if (write(sockfd, &response, sizeof(msg_enum)) != sizeof(msg_enum)) {
@@ -82,6 +82,30 @@ int writeBackRegister(int sockfd, int accountNumber) {
 
     if (write(sockfd, &balance, sizeof(float)) != sizeof(float)) {
         perror("ERROR: Cannot write\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+// return 1 for success, 0 for error
+int handleAndRespondCashRequest(int sockfd) {
+    float requestedCash;
+
+    if (read(sockfd, &requestedCash, sizeof(float)) != sizeof(float)) {
+        perror("ERROR: failure to read from sockfd\n");
+        return 0;
+    }
+
+    int returnMsg = htonl(CASH);
+
+    if (write(sockfd, &returnMsg, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: failure to write to sockfd\n");
+        return 0;
+    }
+
+    if (write(sockfd, &requestedCash, sizeof(float)) != sizeof(float)) {
+        perror("ERROR: failure to write to sockfd\n");
         return 0;
     }
 
@@ -214,17 +238,17 @@ void* worker(void* arg) {
             switch (recv) {
                 case REGISTER:
                     printf("REGISTER\n");
-                    int accountNumber = registerAccount(sockfd);
+                    int accountNumber = handleRegister(sockfd);
                     if (accountNumber < 0) {
                         freeBalances();
                         exit(EXIT_FAILURE);
                     }
                         
-                    if (writeBackRegister(sockfd, accountNumber) == 0) {
+                    if (respondRegister(sockfd, accountNumber) == 0) {
                         freeBalances();
                         exit(EXIT_FAILURE);
                     }
-                    printf("Success\n");
+
                     break;
                 case GET_ACCOUNT_INFO:
                     // // need to read in int account_number
@@ -258,13 +282,9 @@ void* worker(void* arg) {
                     // write back BALANCE
                     break;
                 case REQUEST_CASH:
-                    // need to read in float amount
-                    // results = read(sockfd, buf, MSG_BUFFER_SIZE);
-                    // amount = atof(buf);
-                    // requestCash(amount);
                     printf("REQUEST_CASH\n");
-
-                    // write back CASH
+                    handleAndRespondCashRequest(sockfd);
+                
                     break;
                 case REQUEST_HISTORY:
                     printf("REQUEST_HISTORY\n");
@@ -278,13 +298,6 @@ void* worker(void* arg) {
                     fprintf(stderr, "ERROR: Bad recv argument.\n");
                     freeBalances();
                     exit(0);
-            }
-
-            int response = htonl(selectResponse(recv));
-
-            if (write(sockfd, &response, sizeof(int)) < 0) {
-                perror("Cannot write");
-                exit(1);
             }
         }
 

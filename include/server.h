@@ -25,7 +25,7 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
  * @param sockfd
  * @return account number for success, -1 for failure
  */
- int registerAccount(int sockfd);
+ int handleRegister(int sockfd);
 
 /**
  * Write response to REGISTER back to client
@@ -33,7 +33,7 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
  * @param accountNumber
  * @return 1 for success, 0 for failure
  */
- int writeBackRegister(int sockfd, int accountNumber);
+ int respondRegister(int sockfd, int accountNumber);
 
 /**
  * Update account with transaction data
@@ -42,6 +42,13 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
  * @return 1 on success, 0 on unitialized, -1 on insufficient funds
  */
  int addTransaction(int accountNumber, float transaction);
+
+/**
+ * Read in how much cash the client wants and send it back.
+ * @param sockfd
+ * @return 1 for success, 0 for error
+ */
+ int handleAndRespondCashRequest(int sockfd);
 
  /**
   * Initialize balances to all NULLS

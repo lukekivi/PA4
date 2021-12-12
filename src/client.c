@@ -7,33 +7,33 @@ void printSyntax(){
     printf("usage: $ ./client input_filename server_addr server_port\n");
 }
 
-void func(int sockfd, int msg) {
-    int convMsg = htonl(msg);
+void terminate(int sockfd) {
+    int convMsg = htonl(TERMINATE);
 
     if (write(sockfd, &convMsg, sizeof(int)) < 0) {
-        perror("Cannot write");
-        exit(1);
+        perror("ERROR: Cannot write to sockfd\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
-    
-    while (1) {
-        int temp;
-        int results = read(sockfd, &temp, sizeof(int));
-        
-        int rcv = ntohl(temp);
-        
-        if (results < 0) {
-            perror("cannot read");
-            exit(1);
-        } else if (results > 0) {
-            msg_enum msg = rcv;
-            printEnumName(msg);
-            if (msg == TERMINATE) {
-                close(sockfd);
-                exit(EXIT_SUCCESS);
-            }
-            break;
-        }
+
+    int temp;
+    if (read(sockfd, &temp, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: Cannot read from sockfd\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
+        
+    msg_enum rcv = ntohl(temp);
+
+    if (rcv != TERMINATE) {
+        perror("ERROR: Didn't receive TERMINATE back from server\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+        
+    printEnumName(rcv);
+    close(sockfd);
+    exit(EXIT_SUCCESS);
 }
 
 // FUNCTION: REGISTER
@@ -42,27 +42,32 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
     int convMsg = htonl(REGISTER);
 
     if (write(sockfd, &convMsg, sizeof(int)) != sizeof(int)) {
-        perror("Cannot write");
-        exit(1);
+        perror("ERROR: Cannot write to sockfd\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
 
     if (writeStringToSocket(sockfd, username) == 0) {
-        exit(1);
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
     
     if (writeStringToSocket(sockfd, name) == 0) {
-        exit(1);
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
 
     if (write(sockfd, &birthday, sizeof(time_t)) != sizeof(time_t)) {
-        perror("Cannot write");
-        exit(1);
+        perror("ERROR: Cannot write to sockfd\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
     
     msg_enum tempMsg;
         
     if (read(sockfd, &tempMsg, sizeof(msg_enum)) < 0) {
         perror("ERROR: failed to read from sockfd\n");
+        close(sockfd);
         exit(EXIT_FAILURE);
     }
             
@@ -70,6 +75,7 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
             
     if (msg != BALANCE) {
         perror("ERROR: failed to follow protocol\n");
+        close(sockfd);
         exit(EXIT_FAILURE);
     } else {
         printEnumName(msg);
@@ -79,6 +85,7 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
         
     if (read(sockfd, &tempAccountNumber, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failed to read from sockfd\n");
+        close(sockfd);
         exit(EXIT_FAILURE);
     } 
             
@@ -89,6 +96,7 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
 
     if (read(sockfd, &balance, sizeof(float)) != sizeof(float)) {
         perror("ERROR: failed to read from sockfd\n");
+        close(sockfd);
         exit(EXIT_FAILURE);
     }
     
@@ -98,38 +106,43 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
 
 // FUNCTION: REQUEST_CASH
 // Request that the recipient is sent cash
-void request_cash (int sockfd, float amount) {
-    int amt = 0;
-    float request = amount;
-    int msg_type = htonl(REQUEST_CASH);
+void request_cash (int sockfd) {
+    float request = CASH_AMOUNT;
+    msg_enum msg = htonl(REQUEST_CASH);
 
-    if ((amt = write(sockfd, &msg_type, sizeof(int))) != sizeof(int)) {
+    if (write(sockfd, &msg, sizeof(msg_enum)) != sizeof(msg_enum)) {
         perror("ERROR: Cannot write to socket\n");
-        exit(1);
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
 
-    if ((amt = write(sockfd, &request, sizeof(float))) != sizeof(float)) {
+    if (write(sockfd, &request, sizeof(float)) != sizeof(float)) {
         perror("ERROR: Cannot write to socket\n");
-        exit(1);
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
 
-    int rcvMessage_type;
-    float rcvCash;
-    if ((amt = read(sockfd, &rcvMessage_type, sizeof(msg_enum))) != sizeof(msg_enum)) {
+    msg_enum rcvMsgType;
+    if (read(sockfd, &rcvMsgType, sizeof(msg_enum)) != sizeof(msg_enum)) {
         perror("ERROR: Cannot read account number\n.");
-        exit(1);
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
     
-    int translatedMessage = ntohl(rcvMessage_type);
+    int translatedMessage = ntohl(rcvMsgType);
+
+    printf("Msg: %d\n", translatedMessage);
     
     if (translatedMessage != CASH) {
         printf("Request cash recieved wrong response type.\n");
         return;
     }
     
-    if ((amt = read(sockfd, &rcvCash, sizeof(float))) != sizeof(float)) {
-        perror("Cannot read balance.");
-        exit(1);
+    float rcvCash;
+    if (read(sockfd, &rcvCash, sizeof(float)) != sizeof(float)) {
+        perror("ERROR: Cannot read balance.\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
     }
   
     clientCash += rcvCash;
@@ -185,7 +198,7 @@ int main(int argc, char *argv[]){
     // connect the client socket to server socket
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
         printf("Connection with the server failed...\n");
-        exit(0);
+        exit(EXIT_FAILURE);
     }
     else
         printf("Connected to the server..\n");
@@ -202,13 +215,12 @@ int main(int argc, char *argv[]){
 
 
     register_user(sockfd, name, username, birthday);
-    // func(sockfd, GET_ACCOUNT_INFO);
-    // func(sockfd, TRANSACT);
-    // func(sockfd, REGISTER);
-    // func(sockfd, GET_BALANCE);
-    // func(sockfd, REQUEST_CASH);
-    // func(sockfd, REQUEST_HISTORY);
-    func(sockfd, TERMINATE);
+
+    printf("Starting cash: %f\n", clientCash);
+    request_cash(sockfd);
+    printf("Ending cash: %f\n", clientCash);
+
+    terminate(sockfd);
     
     close(sockfd);
 
