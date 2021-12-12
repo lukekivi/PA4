@@ -112,6 +112,43 @@ int handleAndRespondCashRequest(int sockfd) {
     return 1;
 }
 
+// return 1 for success, 0 for error
+int handleAndRespondGetBalance(int sockfd) {
+    int accountNumber;
+
+    if (read(sockfd, &accountNumber, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: failed to read account number from socket.\n");
+        return 0;
+    }
+
+    accountNumber = ntohl(accountNumber);
+    printf("Asked for accountNumber: %d\n", accountNumber);
+
+    sem_wait(&mutexBalances[accountNumber]);
+    float balance = balances[accountNumber]->balance;
+    sem_post(&mutexBalances[accountNumber]);
+
+    printf("Balance: %f\n", balance);
+    
+    int returnMsg = htonl(BALANCE);
+    if (write(sockfd, &returnMsg, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: failed to write return message to socket.\n");
+        return 0;
+    }
+
+    accountNumber = htonl(accountNumber);
+    if (write(sockfd, &accountNumber, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: failed to write account number to socket.\n");
+        return 0;
+    }
+
+    if (write(sockfd, &balance, sizeof(float)) != sizeof(float)) {
+        perror("ERROR: failed to write balacnce to socket.\n");
+        return 0;
+    }
+
+    return 1;
+}
 
 int addTransaction(int accountNumber, float transaction) {
     sem_wait(&mutexBalances[accountNumber]);
@@ -215,8 +252,10 @@ void* worker(void* arg) {
         while (1) {
             int temp;
             if (read(sockfd, &temp, sizeof(int)) != sizeof(int)) {
-                perror("ERROR: Cannot read\n");
-                exit(1);
+                perror("ERROR: Cannot read from sockfd\n.");
+                close(sockfd);
+                freeBalances();
+                exit(EXIT_FAILURE);
             }
             msg_enum recv = ntohl(temp);
 
@@ -229,8 +268,10 @@ void* worker(void* arg) {
                 int response = htonl(recv);
 
                 if (write(sockfd, &response, sizeof(int)) != sizeof(int)) {
-                    perror("ERROR: Cannot write\n");
-                    exit(1);
+                    perror("ERROR: Cannot write from sockfd\n.");
+                    close(sockfd);
+                    freeBalances();
+                    exit(EXIT_FAILURE);
                 }
                 break;
             }
@@ -241,11 +282,13 @@ void* worker(void* arg) {
                     int accountNumber = handleRegister(sockfd);
                     if (accountNumber < 0) {
                         freeBalances();
+                        close(sockfd);
                         exit(EXIT_FAILURE);
                     }
                         
                     if (respondRegister(sockfd, accountNumber) == 0) {
                         freeBalances();
+                        close(sockfd);
                         exit(EXIT_FAILURE);
                     }
 
@@ -271,15 +314,12 @@ void* worker(void* arg) {
                     // write back BALANCE
                     break;
                 case GET_BALANCE:
-                    // need to read in int account_number and float amount
-                    // results = read(sockfd, buf, MSG_BUFFER_SIZE);
-                    // account_number = atoi(buf);
-                    // results = read(sockfd, buf, MSG_BUFFER_SIZE);
-                    // amount = atof(buf);
-                    // get_balance(account_number, amount);
                     printf("GET_BALANCE\n");
-
-                    // write back BALANCE
+                    if (handleAndRespondGetBalance(sockfd) == 0) {
+                        freeBalances();
+                        close(sockfd);
+                        exit(EXIT_FAILURE);
+                    }
                     break;
                 case REQUEST_CASH:
                     printf("REQUEST_CASH\n");
@@ -292,11 +332,13 @@ void* worker(void* arg) {
                 case ERROR:
                     printf("ERROR\n");
                     freeBalances();
+                    close(sockfd);
                     exit(EXIT_FAILURE);
                     break;
                 default:
                     fprintf(stderr, "ERROR: Bad recv argument.\n");
                     freeBalances();
+                    close(sockfd);
                     exit(0);
             }
         }

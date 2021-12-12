@@ -7,6 +7,9 @@ void printSyntax(){
     printf("usage: $ ./client input_filename server_addr server_port\n");
 }
 
+// FUNCTION: TERMINATE
+// Alert the server of termination, once response is received
+// Terminate connection
 void terminate(int sockfd) {
     int convMsg = htonl(TERMINATE);
 
@@ -33,7 +36,7 @@ void terminate(int sockfd) {
         
     printEnumName(rcv);
     close(sockfd);
-    exit(EXIT_SUCCESS);
+    return;
 }
 
 // FUNCTION: REGISTER
@@ -148,6 +151,64 @@ void request_cash (int sockfd) {
     clientCash += rcvCash;
 }
 
+// FUNCTION: GET_BALANCE
+// Get the balance of a specific account
+float get_balance (int sockfd, int accountNumber) {
+    int msg = htonl(GET_BALANCE);
+
+    if (write(sockfd, &msg, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: Cannot write to socket\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+    
+    int accNum = htonl(accountNumber);
+    if (write(sockfd, &accNum, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: Cannot write to socket\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    msg_enum rcvMsg;
+    
+    if (read(sockfd, &rcvMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("ERROR: Failed to read message type from socket\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    } 
+
+    rcvMsg = ntohl(rcvMsg);
+    if (rcvMsg != BALANCE) {
+        perror("ERROR: Did not receive BALANCE back from sever after sending GET_BALANCE\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    int rcvAccount_number;
+    if (read(sockfd, &rcvAccount_number, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: Failed to read account number from socket\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+    
+    rcvAccount_number = ntohl(rcvAccount_number);
+    if (rcvAccount_number != accountNumber) {
+        printf("ERROR: get_balance recieved the wrong account number.\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+        
+    float rcvBalance;
+    if (read(sockfd, &rcvBalance, sizeof(float)) != sizeof(float)) {
+        perror("ERROR: Failed to read balance from socket.\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Received balance: %f\n", rcvBalance);
+
+    return rcvBalance;
+}
 
 
 int main(int argc, char *argv[]){
@@ -219,6 +280,8 @@ int main(int argc, char *argv[]){
     printf("Starting cash: %f\n", clientCash);
     request_cash(sockfd);
     printf("Ending cash: %f\n", clientCash);
+
+    get_balance(sockfd, 0);
 
     terminate(sockfd);
     

@@ -51,6 +51,13 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
  int handleAndRespondCashRequest(int sockfd);
 
  /**
+  * Read in account number and send back balance.
+  * @param sockfd
+  * @return 1 for success, 0 for error
+  */
+  int handleAndRespondGetBalance(int sockfd);
+
+ /**
   * Initialize balances to all NULLS
   */ 
   void initBalances();
