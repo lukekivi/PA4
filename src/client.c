@@ -1,11 +1,4 @@
 #include "../include/client.h"
-// if u get terminate, end connection, then read to see if theres anything more and open more
-// get BALANCE
-// request_cash
-// request history (extra credit)
-// error: some error handling
-// doing with utility
-// int htonl
 
 int clientCash = START_CASH;
 
