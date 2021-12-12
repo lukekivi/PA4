@@ -3,6 +3,8 @@
 
 #include "utils.h"
 
+extern float clientCash;
+
 void printSyntax();
 
 void func(int sockfd, int msg);

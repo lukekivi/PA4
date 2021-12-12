@@ -39,7 +39,7 @@ int registerAccount(int sockfd) {
 
     time_t birthday;
 
-    if (read(sockfd, &birthday, sizeof(time_t)) < 0) {
+    if (read(sockfd, &birthday, sizeof(time_t)) != sizeof(time_t)) {
         perror("ERROR: failure to read from sockfd\n");
         return -1;
     }
@@ -53,6 +53,7 @@ int registerAccount(int sockfd) {
     acc->numTransactions = 0;
     acc->transactionsSize = STARTING_TRANSACTIONS_SIZE;
 
+    sem_wait(&numAccountsMutex);
     balances[numAccounts] = acc;
     int accountNumber = numAccounts;
     numAccounts += 1;
@@ -65,21 +66,21 @@ int registerAccount(int sockfd) {
 int writeBackRegister(int sockfd, int accountNumber) {
     msg_enum response = htonl(BALANCE);
 
-    if (write(sockfd, &response, sizeof(msg_enum)) < 0) {
+    if (write(sockfd, &response, sizeof(msg_enum)) != sizeof(msg_enum)) {
         perror("ERROR: Cannot write\n");
         return 0;
     }
 
     int accNum = htonl(accountNumber);
 
-    if (write(sockfd, &accNum, sizeof(int)) < 0) {
+    if (write(sockfd, &accNum, sizeof(int)) != sizeof(int)) {
         perror("ERROR: Cannot write\n");
         return 0;
     }
 
     float balance = 0.0;
 
-    if (write(sockfd, &balance, sizeof(float)) < 0) {
+    if (write(sockfd, &balance, sizeof(float)) != sizeof(float)) {
         perror("ERROR: Cannot write\n");
         return 0;
     }
@@ -89,6 +90,7 @@ int writeBackRegister(int sockfd, int accountNumber) {
 
 
 int addTransaction(int accountNumber, float transaction) {
+    sem_wait(&mutexBalances[accountNumber]);
     struct account* acc = balances[accountNumber];
 
     if (acc == NULL) {
@@ -105,15 +107,17 @@ int addTransaction(int accountNumber, float transaction) {
         acc->balance += transaction;
 
         balances[accountNumber] = acc;
-
-        return 1;
     }
+    sem_post(&mutexBalances[accountNumber]);
+    sem_wait(&mutexBalances[accountNumber]);
 }
 
 
  void freeBalances() {
      sem_wait(&numAccountsMutex);
      for (int i = 0; i < numAccounts; i++) {
+         sem_wait(&mutexBalances[i]);
+
          free(balances[i]->username);
          free(balances[i]->name);
          free(balances[i]->transactions);
@@ -122,6 +126,8 @@ int addTransaction(int accountNumber, float transaction) {
          balances[i]->transactions = NULL;
          free(balances[i]);
          balances[i] = NULL;
+
+         sem_post(&mutexBalances[i]);
      }
      sem_post(&numAccountsMutex);
 
@@ -147,10 +153,11 @@ void* writeLog() {
             exit(EXIT_FAILURE);            
         }
 
-        sem_wait(&numAccountsMutex);
+        // sem_wait(&numAccountsMutex);
         int curNumAccounts = numAccounts;
-        sem_post(&numAccountsMutex);
+        // sem_post(&numAccountsMutex);
 
+        printf("Logging\n");
         for (int i=0; i < curNumAccounts; i++) {
             sem_wait(&mutexBalances[i]);
             struct account* acc = balances[i];
@@ -183,7 +190,7 @@ void* worker(void* arg) {
         
         while (1) {
             int temp;
-            if (read(sockfd, &temp, sizeof(int)) < 0) {
+            if (read(sockfd, &temp, sizeof(int)) != sizeof(int)) {
                 perror("ERROR: Cannot read\n");
                 exit(1);
             }
@@ -197,7 +204,7 @@ void* worker(void* arg) {
                 printf("TERMINATE\n");
                 int response = htonl(recv);
 
-                if (write(sockfd, &response, sizeof(int)) < 0) {
+                if (write(sockfd, &response, sizeof(int)) != sizeof(int)) {
                     perror("ERROR: Cannot write\n");
                     exit(1);
                 }

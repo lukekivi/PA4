@@ -1,29 +1,24 @@
 #include "utils.h"
 
-void _removeOutputDir()
-{
+void _removeOutputDir() {
     pid_t pid = fork();
-    if(pid == 0)
-    {
+    if(pid == 0) {
         char *argv[] = {"rm", "-rf", "output", NULL};
-        if (execvp(*argv, argv) < 0)
-        {
+        if (execvp(*argv, argv) < 0) {
             printf("ERROR: exec failed\n");
             exit(EXIT_FAILURE);
         }
         exit(EXIT_SUCCESS);
-    } else{
+    } else {
         wait(NULL);
     }
 }
 
-void _createOutputDir()
-{
+void _createOutputDir() {
     mkdir("output", ACCESSPERMS);
 }
 
-void bookeepingCode()
-{
+void bookeepingCode() {
     _removeOutputDir();
     sleep(1);
     _createOutputDir();
@@ -48,12 +43,12 @@ int writeStringToSocket(int sockfd, char* str) {
 
     int nLen = htonl(len);
 
-    if (write(sockfd, &nLen, sizeof(int)) < 0) {
+    if (write(sockfd, &nLen, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failed write to sockfd\n");
         return 0;
     }
 
-    if (write(sockfd, str, len) < 0) {
+    if (write(sockfd, str, len) != len) {
         perror("ERROR: failed write to sockfd\n");
         return 0;
     }
@@ -67,7 +62,7 @@ char* readStringFromSocket(int sockfd) {
     int strSize = 0;
     char* str;
 
-    if(read(sockfd, &strSize, sizeof(int)) < 0) {
+    if(read(sockfd, &strSize, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failed to read");
         return NULL;
     } 
@@ -76,7 +71,7 @@ char* readStringFromSocket(int sockfd) {
     str = (char*) malloc(sizeof(char) * strSize);
 
         
-    if(read(sockfd, str, strSize) < 0) {
+    if(read(sockfd, str, strSize) != strSize) {
         perror("ERROR: failed to read");
         free(str);
         return NULL;        

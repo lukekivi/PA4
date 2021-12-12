@@ -1,5 +1,7 @@
 #include "../include/client.h"
 
+float clientCash = START_CASH;
+
 void printSyntax(){
     printf("incorrect usage syntax! \n");
     printf("usage: $ ./client input_filename server_addr server_port\n");
@@ -34,17 +36,15 @@ void func(int sockfd, int msg) {
     }
 }
 
-void funcRegister(int sockfd) {
+// FUNCTION: REGISTER
+// Register a user
+void register_user(int sockfd, char* name, char* username, time_t birthday) {
     int convMsg = htonl(REGISTER);
 
-    if (write(sockfd, &convMsg, sizeof(int)) < 0) {
+    if (write(sockfd, &convMsg, sizeof(int)) != sizeof(int)) {
         perror("Cannot write");
         exit(1);
     }
-
-    char* name = "Lucas Kivi";
-    char* username = "kivix019";
-    time_t birthday = 753131776;
 
     if (writeStringToSocket(sockfd, username) == 0) {
         exit(1);
@@ -54,7 +54,7 @@ void funcRegister(int sockfd) {
         exit(1);
     }
 
-    if (write(sockfd, &birthday, sizeof(time_t)) < 0) {
+    if (write(sockfd, &birthday, sizeof(time_t)) != sizeof(time_t)) {
         perror("Cannot write");
         exit(1);
     }
@@ -77,7 +77,7 @@ void funcRegister(int sockfd) {
 
     int tempAccountNumber;
         
-    if (read(sockfd, &tempAccountNumber, sizeof(int)) < 0) {
+    if (read(sockfd, &tempAccountNumber, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failed to read from sockfd\n");
         exit(EXIT_FAILURE);
     } 
@@ -87,7 +87,7 @@ void funcRegister(int sockfd) {
 
     float balance;        
 
-    if (read(sockfd, &balance, sizeof(float)) < 0) {
+    if (read(sockfd, &balance, sizeof(float)) != sizeof(float)) {
         perror("ERROR: failed to read from sockfd\n");
         exit(EXIT_FAILURE);
     }
@@ -95,6 +95,45 @@ void funcRegister(int sockfd) {
     printf("Balance: %.2f\n", balance);
 }
 
+
+// FUNCTION: REQUEST_CASH
+// Request that the recipient is sent cash
+void request_cash (int sockfd, float amount) {
+    int amt = 0;
+    float request = amount;
+    int msg_type = htonl(REQUEST_CASH);
+
+    if ((amt = write(sockfd, &msg_type, sizeof(int))) != sizeof(int)) {
+        perror("ERROR: Cannot write to socket\n");
+        exit(1);
+    }
+
+    if ((amt = write(sockfd, &request, sizeof(float))) != sizeof(float)) {
+        perror("ERROR: Cannot write to socket\n");
+        exit(1);
+    }
+
+    int rcvMessage_type;
+    float rcvCash;
+    if ((amt = read(sockfd, &rcvMessage_type, sizeof(msg_enum))) != sizeof(msg_enum)) {
+        perror("ERROR: Cannot read account number\n.");
+        exit(1);
+    }
+    
+    int translatedMessage = ntohl(rcvMessage_type);
+    
+    if (translatedMessage != CASH) {
+        printf("Request cash recieved wrong response type.\n");
+        return;
+    }
+    
+    if ((amt = read(sockfd, &rcvCash, sizeof(float))) != sizeof(float)) {
+        perror("Cannot read balance.");
+        exit(1);
+    }
+  
+    clientCash += rcvCash;
+}
 
 
 
@@ -157,8 +196,12 @@ int main(int argc, char *argv[]){
 
     begin = clock();
 
+    char* name = "Lucas Kivi";
+    char* username = "kivix019";
+    time_t birthday = 753131776;
 
-    funcRegister(sockfd);
+
+    register_user(sockfd, name, username, birthday);
     // func(sockfd, GET_ACCOUNT_INFO);
     // func(sockfd, TRANSACT);
     // func(sockfd, REGISTER);
