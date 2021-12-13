@@ -43,6 +43,15 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
  */
  int addTransaction(int accountNumber, float transaction);
 
+ /**
+  * Get the transactions from an account.
+  * @param accountNumber    index of the account
+  * @param numTransactions how many transactions you want, 0 for all
+  * @param arr             array to fill 
+  * @return how many transactions were added to arr, -1 for failure
+  */
+  int getTransactions(int accountNumber, int numTransactions, float** arr);
+
 /**
  * Read in how much cash the client wants and send it back.
  * @param sockfd
@@ -79,6 +88,13 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
    * @return 1 for success, 0 for error
    */
   int getAccountInfo(int sockfd);
+
+  /**
+   * Read in account number, and numTransactions then respond with the transactions.
+   * @param sockfd
+   * @return 1 for success, 0 for error
+   */
+  int getHistory(int sockfd);
 
  /**
   * Initialize balances to all NULLS

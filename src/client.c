@@ -311,16 +311,83 @@ void get_account_info (int sockfd, int acc_num) {
         exit(1);
     }
 
-    printf("Name: %s\n", name);
-    printf("Usename: %s\n", username);
-    printf("Bday: %ld\n", birthday);
-
     free(name);
     free(username);
 }
 
+// FUNCTION: ERROR
+// Generic error message to be sent when the enumerated message type does not match with any in the protocol
+void error (int sock_fd, int message_type) {
+    int msg_type = htonl(ERROR);
+    int wrong_msg_type = htonl(message_type);
 
+    if (write(sock_fd, &msg_type, sizeof(int)) != sizeof(int)) {
+        perror("error failed to write msg_type\n.");
+        exit(1);
+    }
 
+    if (write(sock_fd, &wrong_msg_type, sizeof(int)) != sizeof(int)) {
+        perror("error failed to write wrong_msg_type\n.");
+        exit(1);
+    }
+}
+
+// FUNCTION: REQUEST_HISTORY
+// Request history of account
+void request_history (int sockfd, int accountNum, int numTransactions) {
+    msg_enum msgType = htonl(REQUEST_HISTORY);
+    int msgAccount = htonl(accountNum);
+    int msgNumTransactions = htonl(numTransactions);
+    
+    if (write(sockfd, &msgType, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        printf("request_history failed to write msg_type\n.");
+        exit(1);
+    }
+
+    if (write(sockfd, &msgAccount, sizeof(int)) != sizeof(int)) {
+        perror("request_history failed to write account_num\n.");
+        exit(1);
+    }
+
+    if (write(sockfd, &msgNumTransactions, sizeof(int)) != sizeof(int)) {
+        perror("request_history failed to write msgNumTransactions\n.");
+        exit(1);
+    }
+
+    int rcvAccNum;
+    int rcvNumTransactions;
+
+    if (read(sockfd, &rcvAccNum, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: request_history failed to read account number\n.");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    rcvAccNum = ntohl(rcvAccNum);
+    if (rcvAccNum != accountNum) {
+        perror("ERROR: request_history returned the wrong account number\n.");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    if (read(sockfd, &rcvNumTransactions, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: request_history failed to read num transactions\n.");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    rcvNumTransactions = ntohl(rcvNumTransactions);
+    float transactions[rcvNumTransactions];
+    printf("Numtransactions: %d\n", rcvNumTransactions);
+    for (int i = 0; i < rcvNumTransactions; i++) {
+        if (read(sockfd, &transactions[i], sizeof(float)) != sizeof(float)) {
+            perror("ERROR: request_history failed to read array of transactions\n.");
+            close(sockfd);
+            exit(EXIT_FAILURE);
+        }   
+        printf("Arr[%d] = %f\n", i, transactions[i]);
+    }
+}
 
 int main(int argc, char *argv[]){
     /**
@@ -392,7 +459,17 @@ int main(int argc, char *argv[]){
     transact(sockfd, 0, 20000.00);
     printf("Received balance: %f\n", get_balance(sockfd, 0));
 
+    printf("Received balance: %f\n", get_balance(sockfd, 0));
+    transact(sockfd, 0, 20000.00);
+    printf("Received balance: %f\n", get_balance(sockfd, 0));
+
+    printf("Received balance: %f\n", get_balance(sockfd, 0));
+    transact(sockfd, 0, -900.00);
+    printf("Received balance: %f\n", get_balance(sockfd, 0));
+
     get_account_info(sockfd, 0);
+
+    request_history(sockfd, 0, 1);
 
     terminate(sockfd);
     

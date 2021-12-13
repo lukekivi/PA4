@@ -195,6 +195,29 @@ int addTransaction(int accountNumber, float transaction) {
     return balance;
 }
 
+// Helper function to get an array of transactions from a given account
+int getTransactions(int accountNumber, int numTransactions, float** arr) {
+    sem_wait(&mutexBalances[accountNumber]);
+    struct account* acc = balances[accountNumber];
+    if (acc == NULL) {
+        perror("ERROR: Account number indexed a NULL account\n");
+        return -1;
+    }
+
+    int size = numTransactions;
+    if (numTransactions == 0 || acc->numTransactions < numTransactions) {
+        size = acc->numTransactions;
+    } 
+
+    *arr = (float *) malloc(sizeof(float) * size);
+
+    for (int i = 0; i < size; i++) {
+        (*arr)[i] = acc->transactions[i];
+    }
+    sem_post(&mutexBalances[accountNumber]);
+    return size;
+}
+
 int transact(int sockfd) {
 
     int accNum;
@@ -263,6 +286,52 @@ int getAccountInfo(int sockfd) {
     }
 
     sem_post(&mutexBalances[accNum]);
+
+    return 1;
+}
+
+int getHistory(int sockfd) {
+    int accNum, numTrans;
+
+    if (read(sockfd, &accNum, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: getHistory - failed to read the account number\n");
+        return 0;
+    }
+
+    accNum = ntohl(accNum);
+
+    if (read(sockfd, &numTrans, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: getHistory - failed to read the number of transactions\n");
+        return 0;
+    }
+
+    numTrans = ntohl(numTrans);
+
+    float* transactions = NULL;
+
+    if ((numTrans = getTransactions(accNum, numTrans, &transactions)) == -1) {
+        perror("ERROR: getHistory - error within getTransactions\n");
+        return 0;
+    }
+
+    accNum = htonl(accNum);
+    if (write(sockfd, &accNum, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: getHistory - failed to write the account number\n");
+        return 0;
+    }
+    
+    int replyNumTrans = htonl(numTrans);
+    if (write(sockfd, &replyNumTrans, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: getHistory - failed to write the number of transactions\n");
+        return 0;
+    }
+
+    for (int i = 0; i < numTrans; i++) {
+        if (write(sockfd, &transactions[i], sizeof(float)) != sizeof(float)) {
+            perror("ERROR: getHistory - failed to write transactions\n");
+            return 0;
+        }   
+    }
 
     return 1;
 }
@@ -340,14 +409,16 @@ void* worker(void* arg) {
         }
         
         while (1) {
-            int temp;
-            if (read(sockfd, &temp, sizeof(int)) != sizeof(int)) {
+            msg_enum recv;
+
+            if (read(sockfd, &recv, sizeof(int)) != sizeof(int)) {
                 perror("ERROR: Cannot read from sockfd\n.");
                 close(sockfd);
                 freeBalances();
                 exit(EXIT_FAILURE);
             }
-            msg_enum recv = ntohl(temp);
+            
+            recv = ntohl(recv);
 
             int account_number;
             float amount;
@@ -405,18 +476,45 @@ void* worker(void* arg) {
                     break;
                 case REQUEST_CASH:
                     printf("REQUEST_CASH\n");
-                    cashRequest(sockfd);
+                    if (cashRequest(sockfd) == 0) {
+                        freeBalances();
+                        close(sockfd);
+                        exit(EXIT_FAILURE);
+                    }
                 
                     break;
                 case REQUEST_HISTORY:
                     printf("REQUEST_HISTORY\n");
+                    if (getHistory(sockfd) == 0) {
+                        freeBalances();
+                        close(sockfd);
+                        exit(EXIT_FAILURE);
+                    }
                     
                     break; 
+                case ERROR:
+                    printf("ERROR\n");
+
+                    // Have to receive the message that caused the error
+                    msg_enum errorMsg;
+                    if (read(sockfd, &errorMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+                        perror("ERROR: Cannot read from sockfd\n.");
+                        close(sockfd);
+                        freeBalances();
+                        exit(EXIT_FAILURE);
+                    }
+
+                    break;
                 default:;
                     msg_enum msg = htonl(ERROR);
 
                     if (write(sockfd, &msg, sizeof(msg_enum)) != sizeof(msg_enum)) {
                         perror("ERROR: failed to return ERROR to client.\n");
+                    }
+                    
+                    recv = htonl(recv);
+                    if (write(sockfd, &msg, sizeof(recv)) != sizeof(msg_enum)) {
+                        perror("ERROR: failed to return MSG that caused ERROR to client.\n");
                     }
 
                     perror("ERROR: Bad recv argument.\n");
