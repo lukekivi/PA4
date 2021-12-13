@@ -39,7 +39,7 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
  * Update account with transaction data
  * @param accountNumber index of the account
  * @param transaction   the value change in the account total
- * @return 1 on success, 0 on unitialized, -1 on insufficient funds
+ * @return new balance on success, -1 on failure
  */
  int addTransaction(int accountNumber, float transaction);
 
@@ -48,14 +48,37 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
  * @param sockfd
  * @return 1 for success, 0 for error
  */
- int handleAndRespondCashRequest(int sockfd);
+ int cashRequest(int sockfd);
 
  /**
   * Read in account number and send back balance.
   * @param sockfd
   * @return 1 for success, 0 for error
   */
-  int handleAndRespondGetBalance(int sockfd);
+  int getBalance(int sockfd);
+
+  /**
+   * Sends balance response back to client
+   * @param sockf
+   * @param accNum account number
+   * @param balance
+   * @return 1 for succes, 0 for error
+   */
+   int respondBalance(int sockfd, int accNum, float balance);
+
+ /**
+   * Read in transaction infromation and then respond to it.
+   * @param sockfd
+   * @return 1 for success, 0 for error
+   */
+  int transact(int sockfd);
+
+   /**
+   * Read in account number and then respond with account details.
+   * @param sockfd
+   * @return 1 for success, 0 for error
+   */
+  int getAccountInfo(int sockfd);
 
  /**
   * Initialize balances to all NULLS

@@ -18,23 +18,7 @@ void terminate(int sockfd) {
         close(sockfd);
         exit(EXIT_FAILURE);
     }
-
-    int temp;
-    if (read(sockfd, &temp, sizeof(int)) != sizeof(int)) {
-        perror("ERROR: Cannot read from sockfd\n");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
         
-    msg_enum rcv = ntohl(temp);
-
-    if (rcv != TERMINATE) {
-        perror("ERROR: Didn't receive TERMINATE back from server\n");
-        close(sockfd);
-        exit(EXIT_FAILURE);
-    }
-        
-    printEnumName(rcv);
     close(sockfd);
     return;
 }
@@ -106,11 +90,9 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
     printf("Balance: %.2f\n", balance);
 }
 
-
 // FUNCTION: REQUEST_CASH
 // Request that the recipient is sent cash
-void request_cash (int sockfd) {
-    float request = CASH_AMOUNT;
+void request_cash (int sockfd, float request) {
     msg_enum msg = htonl(REQUEST_CASH);
 
     if (write(sockfd, &msg, sizeof(msg_enum)) != sizeof(msg_enum)) {
@@ -205,10 +187,139 @@ float get_balance (int sockfd, int accountNumber) {
         exit(EXIT_FAILURE);
     }
 
-    printf("Received balance: %f\n", rcvBalance);
-
     return rcvBalance;
 }
+
+// FUNCTION: TRANSACT
+// Send a transaction for an account
+void transact (int sockfd, int account_number, float amount) {
+    // send a GET_BALANCE message to the server to ensure
+    // that the account will not go negative
+    float rcvBalance = get_balance(sockfd, account_number);
+
+    if ((rcvBalance + amount) < 0) {
+        return; // if account can go negative, ignore transact
+    }
+
+    // send GET_CASH to server until the cash variable will not go negative.
+    while (clientCash + amount < 0) {
+        request_cash(sockfd, CASH_AMOUNT);
+    }
+
+    int rcvAccount_number;
+    msg_enum msg_type, rcvMessage_type;
+
+    // send TRANSACTION to the server
+    msg_type = htonl(TRANSACT);
+    if (write(sockfd, &msg_type, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("Cannot write");
+        exit(1);
+    }
+
+    if (write(sockfd, &account_number, sizeof(int)) != sizeof(int)) {
+        perror("Cannot write");
+        exit(1);
+    }
+
+    if (write(sockfd, &amount, sizeof(float)) != sizeof(float)) {
+        perror("Cannot write");
+        exit(1);
+    }
+
+    // add the value of the transaction to the cash variable
+    clientCash += amount;
+
+    // balance is returned
+    if (read(sockfd, &rcvMessage_type, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("Cannot read message type.");
+        exit(1);
+    } 
+      
+    rcvMessage_type = ntohl(rcvMessage_type);
+    printf("TRANSACT: msg : %d\n", rcvMessage_type);
+  
+    if (read(sockfd, &rcvAccount_number, sizeof(int)) != sizeof(msg_enum)) {
+        perror("Cannot read account number.");
+        exit(1);
+    } 
+    
+    rcvAccount_number = ntohl(rcvAccount_number);
+      
+    if (read(sockfd, &rcvBalance, sizeof(float)) != sizeof(float)) {
+      perror("Cannot read balance.");
+      exit(1);
+    }
+}
+
+// FUNCTION: GET_ACCOUNT_INFO
+// request the information for a specific account
+void get_account_info (int sockfd, int acc_num) {
+    msg_enum msg_type = htonl(GET_ACCOUNT_INFO);
+    msg_enum rsp_type;
+
+    char* name = (char*)malloc(sizeof(char)*MAX_STR);
+    char* username = (char*)malloc(sizeof(char)*MAX_STR);
+    time_t birthday;
+
+    // write message type
+    if (write(sockfd, &msg_type, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("get_account_info failed to write msg_type\n.");
+        close(sockfd);
+        exit(1);
+    }
+
+    // write account number
+    if (write(sockfd, &acc_num, sizeof(int)) != sizeof(int)) {
+        perror("get_account_info failed to write msg_type\n.");
+        close(sockfd);
+        exit(1);
+    }
+
+
+    // read message type
+    if (read(sockfd, &rsp_type, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("get_account_info failed to read rsp_type\n.");
+        close(sockfd);
+        exit(1);
+    }
+    
+    // make sure message type is account info
+    if (rsp_type = ntohl(rsp_type) != ACCOUNT_INFO) {
+        perror("get_account_info recieved the wrong rsp_type\n");
+        close(sockfd);
+        exit(1);
+    }
+
+    // read username
+    if ((username = readStringFromSocket(sockfd)) == NULL) {
+        perror("get_account_info failed to read username\n.");
+        close(sockfd);
+        exit(1);
+    }
+  
+    // read name
+    if ((name = readStringFromSocket(sockfd)) == NULL) {
+        perror("get_account_info failed to read name\n.");
+        close(sockfd);
+        exit(1);
+    }
+  
+    // read birthday
+    if (read(sockfd, &birthday, sizeof(time_t)) != sizeof(time_t)) {
+        perror("get_account_info failed to read birthday\n.");
+        close(sockfd);
+        exit(1);
+    }
+
+    printf("Name: %s\n", name);
+    printf("Usename: %s\n", username);
+    printf("Bday: %ld\n", birthday);
+
+    free(name);
+    free(username);
+}
+
+
 
 
 int main(int argc, char *argv[]){
@@ -277,11 +388,11 @@ int main(int argc, char *argv[]){
 
     register_user(sockfd, name, username, birthday);
 
-    printf("Starting cash: %f\n", clientCash);
-    request_cash(sockfd);
-    printf("Ending cash: %f\n", clientCash);
+    printf("Received balance: %f\n", get_balance(sockfd, 0));
+    transact(sockfd, 0, 20000.00);
+    printf("Received balance: %f\n", get_balance(sockfd, 0));
 
-    get_balance(sockfd, 0);
+    get_account_info(sockfd, 0);
 
     terminate(sockfd);
     
