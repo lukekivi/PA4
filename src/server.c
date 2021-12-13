@@ -122,7 +122,6 @@ int getBalance(int sockfd) {
     }
 
     accountNumber = ntohl(accountNumber);
-    printf("Asked for accountNumber: %d\n", accountNumber);
 
     sem_wait(&mutexBalances[accountNumber]);
     float balance = balances[accountNumber]->balance;
@@ -420,19 +419,18 @@ void* worker(void* arg) {
             
             recv = ntohl(recv);
 
-            int account_number;
+            int accountNumber;
             float amount;
+            msg_enum replyMsg;
 
             // when TERMINATE is received close the connection and wait
             if (recv == TERMINATE) {
-                printf("TERMINATE\n");
                 break;
             }
 
             switch (recv) {
                 case REGISTER:
-                    printf("REGISTER\n");
-                    int accountNumber = handleRegister(sockfd);
+                    accountNumber = handleRegister(sockfd);
                     if (accountNumber < 0) {
                         freeBalances();
                         close(sockfd);
@@ -453,11 +451,8 @@ void* worker(void* arg) {
                         exit(EXIT_FAILURE);
                     }
 
-                    printf("GET_ACCOUNT_INFO\n");
-
                     break;
                 case TRANSACT:
-                    printf("TRANSACT\n");
                     if (transact(sockfd) == 0) {
                         freeBalances();
                         close(sockfd);
@@ -466,7 +461,6 @@ void* worker(void* arg) {
 
                     break;
                 case GET_BALANCE:
-                    printf("GET_BALANCE\n");
                     if (getBalance(sockfd) == 0) {
                         freeBalances();
                         close(sockfd);
@@ -475,7 +469,6 @@ void* worker(void* arg) {
 
                     break;
                 case REQUEST_CASH:
-                    printf("REQUEST_CASH\n");
                     if (cashRequest(sockfd) == 0) {
                         freeBalances();
                         close(sockfd);
@@ -484,7 +477,6 @@ void* worker(void* arg) {
                 
                     break;
                 case REQUEST_HISTORY:
-                    printf("REQUEST_HISTORY\n");
                     if (getHistory(sockfd) == 0) {
                         freeBalances();
                         close(sockfd);
@@ -493,11 +485,8 @@ void* worker(void* arg) {
                     
                     break; 
                 case ERROR:
-                    printf("ERROR\n");
-
                     // Have to receive the message that caused the error
-                    msg_enum errorMsg;
-                    if (read(sockfd, &errorMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+                    if (read(sockfd, &replyMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
                         perror("ERROR: Cannot read from sockfd\n.");
                         close(sockfd);
                         freeBalances();
@@ -505,15 +494,15 @@ void* worker(void* arg) {
                     }
 
                     break;
-                default:;
-                    msg_enum msg = htonl(ERROR);
+                default:
+                    replyMsg = htonl(ERROR);
 
-                    if (write(sockfd, &msg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+                    if (write(sockfd, &replyMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
                         perror("ERROR: failed to return ERROR to client.\n");
                     }
                     
                     recv = htonl(recv);
-                    if (write(sockfd, &msg, sizeof(recv)) != sizeof(msg_enum)) {
+                    if (write(sockfd, &recv, sizeof(msg_enum)) != sizeof(msg_enum)) {
                         perror("ERROR: failed to return MSG that caused ERROR to client.\n");
                     }
 
@@ -523,8 +512,6 @@ void* worker(void* arg) {
                     exit(0);
             }
         }
-
-        printf("Socket closed\n");
 
         close(sockfd);
     }
@@ -567,7 +554,7 @@ int main(int argc, char *argv[]) {
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
-        printf("Socket creation failed...\n");
+        perror("Socket creation failed...\n");
         exit(0);
     }
     else {
@@ -582,7 +569,7 @@ int main(int argc, char *argv[]) {
 
     // Binding newly created socket to given IP and verification
     if ((bind(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr))) != 0) {
-        printf("Socket bind failed...\n");
+        perror("Socket bind failed...\n");
         exit(0);
     }
     else
@@ -590,7 +577,7 @@ int main(int argc, char *argv[]) {
 
     // Now server is ready to listen and verification
     if ((listen(sockfd, NCLIENTS)) != 0) {
-        printf("Listen failed...\n");
+        perror("Listen failed...\n");
         exit(0);
     }
     else
@@ -626,7 +613,7 @@ int main(int argc, char *argv[]) {
          // Accept the data packet from client and verification
         int newSockfd = accept(sockfd, (struct sockaddr *)&cli, &len);
         if (sockfd < 0) {
-            printf("Server accept failed...\n");
+            perror("Server accept failed...\n");
             exit(0);
         } else {
             printf("Server accept the client...\n");

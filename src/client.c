@@ -14,7 +14,7 @@ void terminate(int sockfd) {
     int convMsg = htonl(TERMINATE);
 
     if (write(sockfd, &convMsg, sizeof(int)) < 0) {
-        perror("ERROR: Cannot write to sockfd\n");
+        perror("ERROR: terminate - Cannot write to sockfd\n");
         close(sockfd);
         exit(EXIT_FAILURE);
     }
@@ -26,10 +26,10 @@ void terminate(int sockfd) {
 // FUNCTION: REGISTER
 // Register a user
 void register_user(int sockfd, char* name, char* username, time_t birthday) {
-    int convMsg = htonl(REGISTER);
-
-    if (write(sockfd, &convMsg, sizeof(int)) != sizeof(int)) {
-        perror("ERROR: Cannot write to sockfd\n");
+    msg_enum convMsg = htonl(REGISTER);
+    int results;
+    if (write(sockfd, &convMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("ERROR: register_user - Cannot write msg to sockfd\n");
         close(sockfd);
         exit(EXIT_FAILURE);
     }
@@ -45,7 +45,7 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
     }
 
     if (write(sockfd, &birthday, sizeof(time_t)) != sizeof(time_t)) {
-        perror("ERROR: Cannot write to sockfd\n");
+        perror("ERROR: register_user - Cannot write birthday to sockfd\n");
         close(sockfd);
         exit(EXIT_FAILURE);
     }
@@ -64,8 +64,6 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
         perror("ERROR: failed to follow protocol\n");
         close(sockfd);
         exit(EXIT_FAILURE);
-    } else {
-        printEnumName(msg);
     }
 
     int tempAccountNumber;
@@ -77,17 +75,13 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
     } 
             
     int accountNumber = ntohl(tempAccountNumber);           
-    printf("Account Number: %d\n", accountNumber);
 
     float balance;        
-
     if (read(sockfd, &balance, sizeof(float)) != sizeof(float)) {
         perror("ERROR: failed to read from sockfd\n");
         close(sockfd);
         exit(EXIT_FAILURE);
     }
-    
-    printf("Balance: %.2f\n", balance);
 }
 
 // FUNCTION: REQUEST_CASH
@@ -115,9 +109,6 @@ void request_cash (int sockfd, float request) {
     }
     
     int translatedMessage = ntohl(rcvMsgType);
-
-    printf("Msg: %d\n", translatedMessage);
-    
     if (translatedMessage != CASH) {
         printf("Request cash recieved wrong response type.\n");
         return;
@@ -175,7 +166,7 @@ float get_balance (int sockfd, int accountNumber) {
     
     rcvAccount_number = ntohl(rcvAccount_number);
     if (rcvAccount_number != accountNumber) {
-        printf("ERROR: get_balance recieved the wrong account number.\n");
+        perror("ERROR: get_balance recieved the wrong account number.\n");
         close(sockfd);
         exit(EXIT_FAILURE);
     }
@@ -235,9 +226,7 @@ void transact (int sockfd, int account_number, float amount) {
         exit(1);
     } 
       
-    rcvMessage_type = ntohl(rcvMessage_type);
-    printf("TRANSACT: msg : %d\n", rcvMessage_type);
-  
+    rcvMessage_type = ntohl(rcvMessage_type);  
     if (read(sockfd, &rcvAccount_number, sizeof(int)) != sizeof(msg_enum)) {
         perror("Cannot read account number.");
         exit(1);
@@ -340,7 +329,7 @@ void request_history (int sockfd, int accountNum, int numTransactions) {
     int msgNumTransactions = htonl(numTransactions);
     
     if (write(sockfd, &msgType, sizeof(msg_enum)) != sizeof(msg_enum)) {
-        printf("request_history failed to write msg_type\n.");
+        perror("request_history failed to write msg_type\n.");
         exit(1);
     }
 
@@ -378,14 +367,12 @@ void request_history (int sockfd, int accountNum, int numTransactions) {
 
     rcvNumTransactions = ntohl(rcvNumTransactions);
     float transactions[rcvNumTransactions];
-    printf("Numtransactions: %d\n", rcvNumTransactions);
     for (int i = 0; i < rcvNumTransactions; i++) {
         if (read(sockfd, &transactions[i], sizeof(float)) != sizeof(float)) {
             perror("ERROR: request_history failed to read array of transactions\n.");
             close(sockfd);
             exit(EXIT_FAILURE);
         }   
-        printf("Arr[%d] = %f\n", i, transactions[i]);
     }
 }
 
@@ -412,7 +399,7 @@ int main(int argc, char *argv[]){
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
-        printf("Socket creation failed...\n");
+        perror("Socket creation failed...\n");
         exit(0);
     }
     else
@@ -428,7 +415,7 @@ int main(int argc, char *argv[]){
 
 
     int port = atoi(argv[3]);
-    
+
     // assign IP, PORT
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(server_addr);
@@ -436,8 +423,8 @@ int main(int argc, char *argv[]){
 
     // connect the client socket to server socket
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
-        printf("Connection with the server failed...\n");
-        exit(EXIT_FAILURE);
+        perror("Connection with the server failed...\n");
+        exit(0);
     }
     else
         printf("Connected to the server..\n");
@@ -448,36 +435,69 @@ int main(int argc, char *argv[]){
 
     begin = clock();
 
-    char* name = "Lucas Kivi";
-    char* username = "kivix019";
-    time_t birthday = 753131776;
+    // Variable declaration
+    int message_type, account_number, num_transactions;
+    char *line = (char*)malloc(sizeof(char)*MAX_STR);
+    char* name = (char*)malloc(sizeof(char)*MAX_STR);
+    char* username = (char*)malloc(sizeof(char)*MAX_STR);
+    int nameLen, usernameLen;
+    long birthday;
+    float amount;
+
+    // Necessary for reading in variables
+    char *token, *saveptr;
+    char *pattern = ",";
 
 
-    register_user(sockfd, name, username, birthday);
+    FILE *fp = fopen(file, "r");
+    if (fp == NULL) {
+      fprintf(stderr, "ERROR: failed to open file %s\n", file);
+      exit(EXIT_FAILURE);
+    }
 
-    printf("Received balance: %f\n", get_balance(sockfd, 0));
-    transact(sockfd, 0, 20000.00);
-    printf("Received balance: %f\n", get_balance(sockfd, 0));
+    while (fscanf(fp, "%d,%d,%64[^,],%64[^,],%ld,%f,%d\n",
+            &message_type, &account_number, name, username, &birthday, &amount, &num_transactions) != EOF) {
+        switch(message_type) {
+            case REGISTER:
+                register_user(sockfd, name, username, birthday);
+                break;
 
-    printf("Received balance: %f\n", get_balance(sockfd, 0));
-    transact(sockfd, 0, 20000.00);
-    printf("Received balance: %f\n", get_balance(sockfd, 0));
+            case GET_ACCOUNT_INFO:
+                get_account_info(sockfd, account_number);
+                break;
 
-    printf("Received balance: %f\n", get_balance(sockfd, 0));
-    transact(sockfd, 0, -900.00);
-    printf("Received balance: %f\n", get_balance(sockfd, 0));
+            case TRANSACT:
+                transact(sockfd, account_number, amount);
+                break;
 
-    get_account_info(sockfd, 0);
+            case GET_BALANCE:
+                get_balance(sockfd, account_number);
+                break;
 
-    request_history(sockfd, 0, 1);
+            case ERROR:
+                error(sockfd, message_type);
+                break;
 
-    terminate(sockfd);
-    
-    close(sockfd);
+            case TERMINATE:
+                terminate(sockfd);
+                break;
+
+            case REQUEST_HISTORY:
+                request_history (sockfd, account_number, num_transactions);
+                break;
+
+            default:
+                perror("ERROR: Invalid message type read from input file\n");
+                free(line); free(name); free(username); close(sockfd); fclose(fp);
+                exit(EXIT_FAILURE);
+        }
+    }
+
+    free(line); free(name); free(username); close(sockfd); fclose(fp);
 
     end = clock();
     cpu_time = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Elapsed Time: %.2f\n", cpu_time);
 
-    return 0; 
+    return 0;
 }
