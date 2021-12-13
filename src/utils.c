@@ -1,32 +1,164 @@
 #include "utils.h"
 
-void _removeOutputDir()
-{
+void _removeOutputDir() {
     pid_t pid = fork();
-    if(pid == 0)
-    {
+    if(pid == 0) {
         char *argv[] = {"rm", "-rf", "output", NULL};
-        if (execvp(*argv, argv) < 0)
-        {
+        if (execvp(*argv, argv) < 0) {
             printf("ERROR: exec failed\n");
             exit(EXIT_FAILURE);
         }
         exit(EXIT_SUCCESS);
-    } else{
+    } else {
         wait(NULL);
     }
 }
 
-void _createOutputDir()
-{
+void _createOutputDir() {
     mkdir("output", ACCESSPERMS);
 }
 
-void bookeepingCode()
-{
+void bookeepingCode() {
     _removeOutputDir();
     sleep(1);
     _createOutputDir();
+}
+
+msg_enum selectResponse(msg_enum recv) {
+    switch (recv) {
+        case REGISTER:         return BALANCE;
+        case GET_ACCOUNT_INFO: return ACCOUNT_INFO;
+        case TRANSACT:         return BALANCE;
+        case GET_BALANCE:      return BALANCE;
+        case REQUEST_CASH:     return CASH;
+        case REQUEST_HISTORY:  return HISTORY;
+        default: fprintf(stderr, "ERROR: Bad recv argument."); exit(0);
+    }
+}
+
+// writes a string length and then the string itself to the socket fd
+int writeStringToSocket(int sockfd, char* str) {
+    int len = strlen(str) + 1; // +1 for the null terminator
+    int results;
+
+    int nLen = htonl(len);
+
+    if (write(sockfd, &nLen, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: failed write to sockfd\n");
+        return 0;
+    }
+
+    if (write(sockfd, str, len) != len) {
+        perror("ERROR: failed write to sockfd\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+
+// reads string from the socket and returns it or null for an error val
+char* readStringFromSocket(int sockfd) {
+    int strSize = 0;
+    char* str;
+
+    if(read(sockfd, &strSize, sizeof(int)) != sizeof(int)) {
+        perror("ERROR: failed to read");
+        return NULL;
+    } 
+
+    strSize = ntohl(strSize);
+    str = (char*) malloc(sizeof(char) * strSize);
+
+        
+    if(read(sockfd, str, strSize) != strSize) {
+        perror("ERROR: failed to read");
+        free(str);
+        return NULL;        
+    }
+    
+    return str;
+}
+
+/* Return a pointer to an initialized queue */
+struct Queue* initQueue() {
+    struct Queue* q = (struct Queue*) malloc(sizeof(struct Queue));
+    q->head = (struct Node*) malloc(sizeof(struct Node));
+    q->head->next = NULL;
+
+    q->tail = NULL;
+
+    return q;
+}
+
+/* initialize a node */ 
+struct Node* initNode(int sockfd) {
+    struct Node* node = (struct Node*) malloc(sizeof(struct Node));
+    node->next = NULL;
+    node->sockfd = sockfd;
+
+    return node;
+}
+
+/* Add node to the bottom of a queue */
+void enqueue(struct Queue* q, struct Node* node) {
+
+    if (q->tail == NULL) {
+        // case where q is empty
+        q->tail = node;
+        q->head->next = node;
+    } else {
+        // case where q has been started
+        struct Node *temp = q->tail;
+        temp->next = node;
+        q->tail = node;
+    }
+}
+
+/* Pop node from queue - just returns the sockfd */
+int dequeue(struct Queue* q) {
+    if (q->head->next == NULL) {
+        // q is empty
+        return -1;
+    }
+
+    struct Node *temp = q->head->next;
+    if (q->head->next == q->tail) {
+        // last element removed
+        q->tail = NULL;
+    }
+
+    q->head->next = q->head->next->next;
+    temp->next = NULL;
+
+    int sockfd = temp->sockfd;
+    freeNode(temp);
+
+    return sockfd;
+}
+
+/* Deallocate a node */
+void freeNode(struct Node* node) {
+    if (node == NULL) {
+        return;
+    } else {
+        node->next = NULL;        
+        free(node);
+    }
+}
+
+/* free entire queue */
+void freeQueue(struct Queue* q) {
+    struct Node* curNode = q->head;
+    while(curNode != NULL) {
+        struct Node* temp = curNode->next;
+        freeNode(curNode);
+        curNode = temp;
+    }
+    q->head = NULL;
+    q->tail = NULL;
+
+    free(q);
 }
 
 void printEnumName(msg_enum msg) {
@@ -44,29 +176,4 @@ void printEnumName(msg_enum msg) {
         case TERMINATE:        printf("TERMINATE : %d\n", TERMINATE); return;
         case HISTORY:          printf("HISTORY : %d\n", HISTORY);return;
     }
-}
-
-msg_enum selectResponse(msg_enum recv) {
-    switch (recv) {
-        case REGISTER:         return ACCOUNT_INFO;
-        case GET_ACCOUNT_INFO: return ACCOUNT_INFO;
-        case TRANSACT:         return BALANCE;
-        case GET_BALANCE:      return BALANCE;
-        case REQUEST_CASH:     return CASH;
-        case REQUEST_HISTORY:  return HISTORY;
-        default: fprintf(stderr, "ERROR: Bad recv argument."); exit(0);
-    }
-}
-
-/* Check a string to see if it is strictly composed of digits */
-int isDigits(char* str) {
-    int len = strlen(str);
-
-    for (int i = 0; i < len; i++) {
-        if (str[i] < '0' || str[i] > '9') {
-            return -1;
-        }
-    }
-
-    return 1;
 }

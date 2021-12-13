@@ -15,6 +15,8 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <semaphore.h>
+
 
 #define MAX_STR 64
 #define MAX_ACC 1023
@@ -22,11 +24,7 @@
 #define START_CASH 10000
 #define LOGGER_SLEEP 5
 #define NCLIENTS 8
-#define MSG_BUFFER_SIZE 4
 #define MSG_ENUM_SIZE 12
-
-// number of worker threads
-int nWorkers;
 
 /*  DO NOT MODIFY */
 typedef enum {
@@ -47,30 +45,106 @@ typedef enum {
 
 void bookeepingCode();
 
-typedef struct {
+// Struct to hold account information
+struct account {
 	char* username;
 	char* name;
 	time_t birthday;
-	int account_number;
 	float balance;
-}account_info;
+    float* transactions;
+	int numTransactions;
+    int transactionsSize;
+};
 
 /**
- *
- */
-void printEnumName(msg_enum msg);
-
-/**
- * 
+ * Selects the response enum. For use in server. If the enum doesn't have a response it triggers 
+ * an error and exits
+ * @param recv received enum
+ * @return     the correct response enum
  */
 msg_enum selectResponse(msg_enum recv);
 
 /**
- * @brief Check if a string is composed strictly of digits
- * @param str a string
- * @return -1 if a non-digit character was found, 1 if str is composed of digits
+ * Write a string length and then the string itself to sockfd
+ * @param sockfd the socket file descriptor to read from
+ * @param str    the string to be written
+ * @return 1 for success, 0 for failure
  */
-int isDigits(char* str);
+ int writeStringToSocket(int sockfd, char* str);
+
+/**
+ * Read a string size, allocate space for it, and then the string and return it.
+ * @param sockfd the socket file descriptor to read from
+ * @return a pointer to a character array, or NULL for an error value
+ */
+ char* readStringFromSocket(int sockfd);
+
+/**** Queue Code ****/
+
+/**
+ * Node for shared queue linked list
+ * @param next   pointer to the next node in the linked list
+ * @param sockfd fd for socket
+ */
+struct Node {
+    struct Node* next;
+    int sockfd;
+};
+
+/** Queue Stuff **/
+
+/**
+ * Queue for nodes that carry packets
+ * @param tail where nodes are dequeued
+ * @param head dummy node. Head->next is what is dequeued.
+ */
+struct Queue {
+    struct Node* head;
+    struct Node* tail;
+};
+
+/**
+ * Initialize a queue
+ * @returns a pointer to an initialized queue
+ */
+struct Queue* initQueue();
+
+/**
+ * Allocate space for a node and set its fields
+ * @param sockfd the socket fd
+ * @returns      pointer to the malloc'd node
+ */
+ struct Node* initNode(int sockfd);
+
+/**
+ * Add node to a queue. If the queue is empty to start, tail should be a node with it's fields set to NULL.
+ * @param q    the queue
+ * @param node node to be added. node->next should be NULL
+ */
+void enqueue(struct Queue* q, struct Node* node);
+
+/**
+ * Pop the head node off of the queue
+ * @param q    the queue
+ * @returns    the sockfd from popped node, -1 if error
+ */
+int dequeue(struct Queue* q);
+
+/**
+ * Deallocate a node
+ * @param node the node to free
+ */
+void freeNode(struct Node* node);
+
+/**
+ * Free entire queue
+ * @param q    the queue
+ */
+void freeQueue(struct Queue* q);
+
+/**** Debugging Functions ****/
+
+void printEnumName(msg_enum msg);
 
 #endif
 
