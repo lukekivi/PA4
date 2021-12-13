@@ -55,14 +55,14 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
 /**
  * Read in how much cash the client wants and send it back.
  * @param sockfd
- * @return 1 for success, 0 for error
+ * @return 1 for success, -1 for error
  */
  int cashRequest(int sockfd);
 
  /**
   * Read in account number and send back balance.
   * @param sockfd
-  * @return 1 for success, 0 for error
+  * @return 1 for success, 0 for non existant account, -1 for error   
   */
   int getBalance(int sockfd);
 
@@ -78,33 +78,50 @@ extern sem_t numAccountsMutex;              // Mutex for accessing numAccounts
  /**
    * Read in transaction infromation and then respond to it.
    * @param sockfd
-   * @return 1 for success, 0 for error
+   * @return 1 for success, 0 for non existant account, -1 for error   
    */
   int transact(int sockfd);
 
    /**
    * Read in account number and then respond with account details.
    * @param sockfd
-   * @return 1 for success, 0 for error
+   * @return 1 for success, 0 for non existant account, -1 for error   
    */
   int getAccountInfo(int sockfd);
 
   /**
    * Read in account number, and numTransactions then respond with the transactions.
    * @param sockfd
-   * @return 1 for success, 0 for error
+   * @return 1 for success, 0 for non existant account, -1 for error
    */
   int getHistory(int sockfd);
 
- /**
-  * Initialize balances to all NULLS
-  */ 
+  /**
+   * Check if the account exists already
+   * @param  accountNumber
+   * @return 0 for no, 1 for yes
+   */
+   int validAccount(int accountNumber);
+
+  /**
+   * Respond with an error proceeded by the causal message. If the proceeding message is also ERROR that means
+   * that the client requested an account number that doesn't exist.
+   * @param sockfd
+   * @param msg
+   * @return 1 for success, -1 for error
+   */
+   int sendError(int sockfd, msg_enum msg);
+
+
+  /**
+   * Initialize balances to all NULLS
+   */ 
   void initBalances();
 
-/**
- * Free balances array
- */
- void freeBalances();
+  /**
+   * Free balances array
+   */
+  void freeBalances();
 
 #endif
 

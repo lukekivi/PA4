@@ -32,14 +32,13 @@ int handleRegister(int sockfd) {
         perror("ERROR: failure to write to sockfd\n");
         return -1;
     }
-
     char* name;
 
     if ((name = readStringFromSocket(sockfd)) == NULL) {
         perror("ERROR: failure to write to sockfd\n");
         return -1;
     }
-
+    
     time_t birthday;
 
     if (read(sockfd, &birthday, sizeof(time_t)) != sizeof(time_t)) {
@@ -61,7 +60,6 @@ int handleRegister(int sockfd) {
     int accountNumber = numAccounts;
     numAccounts += 1;
     sem_post(&numAccountsMutex);
-
     return accountNumber;
 }
 
@@ -99,19 +97,19 @@ int cashRequest(int sockfd) {
 
     if (read(sockfd, &requestedCash, sizeof(float)) != sizeof(float)) {
         perror("ERROR: failure to read from sockfd\n");
-        return 0;
+        return -1;
     }
 
     int returnMsg = htonl(CASH);
 
     if (write(sockfd, &returnMsg, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failure to write to sockfd\n");
-        return 0;
+        return -1;
     }
 
     if (write(sockfd, &requestedCash, sizeof(float)) != sizeof(float)) {
         perror("ERROR: failure to write to sockfd\n");
-        return 0;
+        return -1;
     }
 
     return 1;
@@ -124,10 +122,15 @@ int getBalance(int sockfd) {
 
     if (read(sockfd, &accountNumber, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failed to read account number from socket.\n");
-        return 0;
+        return -1;
     }
 
     accountNumber = ntohl(accountNumber);
+
+    if (!validAccount(accountNumber)) {
+        perror("ERROR: account doesn't exist.");
+        return 0;
+    }
 
     sem_wait(&mutexBalances[accountNumber]);
     float balance = balances[accountNumber]->balance;
@@ -135,7 +138,7 @@ int getBalance(int sockfd) {
 
     if (respondBalance(sockfd, accountNumber, balance) == 0) {
         perror("ERROR: from getBalance, occurred within respondBalance\n");
-        return 0;
+        return -1;
     }
 
     return 1;
@@ -167,7 +170,6 @@ int respondBalance(int sockfd, int accNum, float balance) {
 // FUNCTION: ADDTRANSACTION
 // Adds to an accounts balance.
 int addTransaction(int accountNumber, float transaction) {
-
     sem_wait(&mutexBalances[accountNumber]);
     struct account* acc = balances[accountNumber];
 
@@ -200,7 +202,6 @@ int addTransaction(int accountNumber, float transaction) {
 
     float balance = acc->balance;
     sem_post(&mutexBalances[accountNumber]);
-
     return balance;
 }
 
@@ -231,24 +232,28 @@ int getTransactions(int accountNumber, int numTransactions, float** arr) {
 // FUNCTION: TRANSACT
 // Facilitates a transaction to deposit to or wirthdrawal from an account.
 int transact(int sockfd) {
-
     int accNum;
     if (read(sockfd, &accNum, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failed to read account number from socket.\n");
-        return 0;
+        return -1;
     }
 
     accNum = ntohl(accNum);
     float amount;
     if (read(sockfd, &amount, sizeof(float)) != sizeof(float)) {
         perror("ERROR: failed to read transaction amount from socket.\n");
+        return -1;
+    }
+
+    if (!validAccount(accNum)) {
+        perror("ERROR: account doesn't exist.");
         return 0;
     }
 
     float balance;
     if ((balance = addTransaction(accNum, amount)) < 0) {
         perror("ERROR: failure within addTransaction\n");
-        return 0;
+        return -1;
     }
 
     if (respondBalance(sockfd, accNum, balance) == 0) {
@@ -264,7 +269,7 @@ int getAccountInfo(int sockfd) {
     int accNum;
     if (read(sockfd, &accNum, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failed to read account number from socket.\n");
-        return 0;
+        return -1;
     }
 
     accNum = ntohl(accNum);
@@ -274,6 +279,7 @@ int getAccountInfo(int sockfd) {
 
     if (acc == NULL) {
         perror("ERROR: requested account is null\n");
+        sem_post(&mutexBalances[accNum]);
         return 0;
     }
 
@@ -281,22 +287,22 @@ int getAccountInfo(int sockfd) {
 
     if (write(sockfd, &rspMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
         perror("ERROR: failed to write response message to socket\n");
-        return 0;
+        return -1;
     }
 
     if (writeStringToSocket(sockfd, acc->username) == 0) {
         perror("ERROR: from getAccountInfo, occurred in writeStringToSocket, failed to write username\n");
-        return 0;
+        return -1;
     }
 
     if (writeStringToSocket(sockfd, acc->name) == 0) {
         perror("ERROR: from getAccountInfo, occurred in writeStringToSocket, failed to write name\n");
-        return 0;
+        return -1;
     }
 
     if (write(sockfd, &acc->birthday, sizeof(time_t)) != sizeof(time_t)) {
         perror("ERROR: failed to write birthday to socket\n");
-        return 0;
+        return -1;
     }
 
     sem_post(&mutexBalances[accNum]);
@@ -311,43 +317,69 @@ int getHistory(int sockfd) {
 
     if (read(sockfd, &accNum, sizeof(int)) != sizeof(int)) {
         perror("ERROR: getHistory - failed to read the account number\n");
-        return 0;
+        return -1;
     }
 
     accNum = ntohl(accNum);
 
     if (read(sockfd, &numTrans, sizeof(int)) != sizeof(int)) {
         perror("ERROR: getHistory - failed to read the number of transactions\n");
-        return 0;
+        return -1;
     }
 
     numTrans = ntohl(numTrans);
+    if (!validAccount(accNum)) {
+        perror("ERROR: account doesn't exist.");
+        return 0;
+    }
 
     float* transactions = NULL;
 
     if ((numTrans = getTransactions(accNum, numTrans, &transactions)) == -1) {
         perror("ERROR: getHistory - error within getTransactions\n");
-        return 0;
+        return -1;
+    }
+
+    msg_enum rsp_msg = htonl(HISTORY);
+
+    if (write(sockfd, &rsp_msg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("ERROR: getHistory - failed to write HISTORY\n");
+        return -1;
     }
 
     accNum = htonl(accNum);
     if (write(sockfd, &accNum, sizeof(int)) != sizeof(int)) {
         perror("ERROR: getHistory - failed to write the account number\n");
-        return 0;
+        return -1;
     }
 
     int replyNumTrans = htonl(numTrans);
     if (write(sockfd, &replyNumTrans, sizeof(int)) != sizeof(int)) {
         perror("ERROR: getHistory - failed to write the number of transactions\n");
-        return 0;
+        return -1;
     }
 
     for (int i = 0; i < numTrans; i++) {
         if (write(sockfd, &transactions[i], sizeof(float)) != sizeof(float)) {
             perror("ERROR: getHistory - failed to write transactions\n");
-            return 0;
+            return -1;
         }
     }
+
+    return 1;
+}
+
+// FUNCTION: VALIDACCOUNT
+// checks if a given accountNumber corresponds to a registered account
+int validAccount(int accountNumber) {
+    sem_wait(&mutexBalances[accountNumber]);
+
+    if (balances[accountNumber] == NULL) {
+        sem_post(&mutexBalances[accountNumber]);
+        return 0;
+    }
+
+    sem_post(&mutexBalances[accountNumber]);
 
     return 1;
 }
@@ -375,6 +407,24 @@ int getHistory(int sockfd) {
      free(balances);
  }
 
+// FUNCTION: SENDERROR
+// sends an error to clinet
+int sendError(int sockfd, msg_enum msg) {
+    msg_enum error = htonl(ERROR);
+    msg_enum rspMsg = htonl(msg);
+
+    if (write(sockfd, &error, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("ERROR: failed to write ERROR to socket\n");
+        return -1;
+    }
+
+    if (write(sockfd, &msg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("ERROR: failed to write MSG to socket\n");
+        return -1;
+    }
+
+    return 1;
+}
 
 void printSyntax() {
     printf("incorrect usage syntax! \n");
@@ -425,7 +475,7 @@ void* worker(void* arg) {
 
         if (sockfd < 0) {
             perror("tried to dequeue from an empty queue");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         while (1) {
@@ -440,17 +490,19 @@ void* worker(void* arg) {
 
             recv = ntohl(recv);
 
-            int accountNumber;
+            int accountNumber, results;
             float amount;
             msg_enum replyMsg;
 
             // when TERMINATE is received close the connection and wait
             if (recv == TERMINATE) {
+                printf("TERMINATE\n");
                 break;
             }
 
             switch (recv) {
                 case REGISTER:
+                    printf("REGISTER\n");
                     accountNumber = handleRegister(sockfd);
                     if (accountNumber < 0) {
                         freeBalances();
@@ -466,46 +518,80 @@ void* worker(void* arg) {
 
                     break;
                 case GET_ACCOUNT_INFO:
-                    if (getAccountInfo(sockfd) == 0) {
+                    printf("GET_ACCOUNT_INFO\n");
+                    results = getAccountInfo(sockfd);
+                    if (results == -1) {
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
+                    } else if (results == 0) {
+                        if (sendError(sockfd, ERROR) == -1 ) {
+                            freeBalances();
+                            close(sockfd);
+                            exit(EXIT_FAILURE);
+                        }
                     }
 
                     break;
                 case TRANSACT:
-                    if (transact(sockfd) == 0) {
+                    printf("TRANSACT\n");
+                    results = transact(sockfd);
+                    if (results == -1) {
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
+                    } else if (results == 0) {
+                        if (sendError(sockfd, ERROR) == -1 ) {
+                            freeBalances();
+                            close(sockfd);
+                            exit(EXIT_FAILURE);
+                        }
                     }
 
                     break;
                 case GET_BALANCE:
-                    if (getBalance(sockfd) == 0) {
+                    printf("GET_BALANCE\n");
+                    results = getBalance(sockfd);
+                    if (results == -1) {
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
+                    } else if (results == 0) {
+                        if (sendError(sockfd, ERROR) == -1 ) {
+                            freeBalances();
+                            close(sockfd);
+                            exit(EXIT_FAILURE);
+                        }
                     }
 
                     break;
                 case REQUEST_CASH:
-                    if (cashRequest(sockfd) == 0) {
+                    printf("REQUEST_CASH\n");
+                    if (cashRequest(sockfd) == -1) {
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
-                    }
+                    } 
 
                     break;
                 case REQUEST_HISTORY:
-                    if (getHistory(sockfd) == 0) {
+                    printf("REQUEST_HISTORY\n");
+                    results = getHistory(sockfd);
+                    if (results == -1) {
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
+                    } else if (results == 0) {
+                        if (sendError(sockfd, ERROR) == -1 ) {
+                            freeBalances();
+                            close(sockfd);
+                            exit(EXIT_FAILURE);
+                        }
                     }
 
                     break;
                 case ERROR:
+                    printf("ERROR\n");
                     // Have to receive the message that caused the error
                     if (read(sockfd, &replyMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
                         perror("ERROR: Cannot read from sockfd\n.");
@@ -516,16 +602,7 @@ void* worker(void* arg) {
 
                     break;
                 default:
-                    replyMsg = htonl(ERROR);
-
-                    if (write(sockfd, &replyMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
-                        perror("ERROR: failed to return ERROR to client.\n");
-                    }
-
-                    recv = htonl(recv);
-                    if (write(sockfd, &recv, sizeof(msg_enum)) != sizeof(msg_enum)) {
-                        perror("ERROR: failed to return MSG that caused ERROR to client.\n");
-                    }
+                    sendError(sockfd, recv);
 
                     perror("ERROR: Bad recv argument.\n");
                     freeBalances();

@@ -41,13 +41,14 @@ int writeStringToSocket(int sockfd, char* str) {
     int len = strlen(str) + 1; // +1 for the null terminator
     int results;
 
+    printf("Len: %d\n", len);
     int nLen = htonl(len);
-
     if (write(sockfd, &nLen, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failed write to sockfd\n");
         return 0;
     }
 
+    printf("String: %s\n", str);
     if (write(sockfd, str, len) != len) {
         perror("ERROR: failed write to sockfd\n");
         return 0;
@@ -61,22 +62,22 @@ int writeStringToSocket(int sockfd, char* str) {
 char* readStringFromSocket(int sockfd) {
     int strSize = 0;
     char* str;
-
     if(read(sockfd, &strSize, sizeof(int)) != sizeof(int)) {
         perror("ERROR: failed to read");
         return NULL;
     } 
-
     strSize = ntohl(strSize);
+
+    printf("strSize: %d\n", strSize);
     str = (char*) malloc(sizeof(char) * strSize);
 
-        
+    printf("got here\n");
     if(read(sockfd, str, strSize) != strSize) {
         perror("ERROR: failed to read");
         free(str);
         return NULL;        
     }
-    
+    printf("String: %s\n", str);
     return str;
 }
 

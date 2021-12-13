@@ -8,6 +8,19 @@ void printSyntax(){
     printf("usage: $ ./client input_filename server_addr server_port\n");
 }
 
+// FUNCTION: READINMSG
+// read in a message, covert it, and return it
+msg_enum readInMsg(int sockfd) {
+    msg_enum msg;
+
+    if (read(sockfd, &msg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("ERROR: failed to read from sockfd\n");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+    return ntohl(msg);
+}
+
 int connectSocket(struct sockaddr_in servaddr) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
@@ -106,6 +119,11 @@ void register_user(int sockfd, char* name, char* username, time_t birthday) {
     msg_enum msg = ntohl(tempMsg);
 
     if (msg != BALANCE) {
+        if (msg == ERROR) {
+            readInMsg(sockfd); // burn extra message, the account didn't exist
+            perror("ERROR: transaction invalid, account didn't exist");
+            return;
+        }
         perror("ERROR: failed to follow protocol\n");
         error(sockfd, msg);
         close(sockfd);
@@ -156,6 +174,11 @@ void request_cash (int sockfd, float request) {
 
     int translatedMessage = ntohl(rcvMsgType);
     if (translatedMessage != CASH) {
+        if (translatedMessage == ERROR) {
+            readInMsg(sockfd); // burn extra message, the account didn't exist
+            perror("ERROR: transaction invalid, account didn't exist");
+            return;
+        }
         printf("Request cash recieved wrong response type.\n");
         error(sockfd, translatedMessage);
         return;
@@ -199,6 +222,11 @@ float get_balance (int sockfd, int accountNumber) {
 
     rcvMsg = ntohl(rcvMsg);
     if (rcvMsg != BALANCE) {
+        if (rcvMsg == ERROR) {
+            readInMsg(sockfd); // burn extra message, the account didn't exist
+            perror("ERROR: transaction invalid, account didn't exist");
+            return -1;
+        }
         perror("ERROR: Did not receive BALANCE back from sever after sending GET_BALANCE\n");
         error(sockfd, rcvMsg);
         close(sockfd);
@@ -256,6 +284,7 @@ void transact (int sockfd, int account_number, float amount) {
         exit(EXIT_FAILURE);
     }
 
+    account_number = htonl(account_number);
     if (write(sockfd, &account_number, sizeof(int)) != sizeof(int)) {
         perror("ERROR: Transact could not write account_number to server.\n");
         close(sockfd);
@@ -280,6 +309,11 @@ void transact (int sockfd, int account_number, float amount) {
 
     rcvMessage_type = ntohl(rcvMessage_type);
     if (rcvMessage_type != BALANCE) {
+        if (rcvMessage_type == ERROR) {
+            readInMsg(sockfd); // burn extra message, the account didn't exist
+            perror("ERROR: transaction invalid, account didn't exist");
+            return;
+        }
         perror("ERROR: Did not receive BALANCE back from sever after sending GET_BALANCE\n");
         error(sockfd, rcvMessage_type);
         close(sockfd);
@@ -335,6 +369,11 @@ void get_account_info (int sockfd, int acc_num) {
 
     // make sure message type is account info
     if (rsp_type = ntohl(rsp_type) != ACCOUNT_INFO) {
+        if (rsp_type == ERROR) {
+            readInMsg(sockfd); // burn extra message, the account didn't exist
+            perror("ERROR: transaction invalid, account didn't exist");
+            return;
+        }
         perror("ERROR: get_account_info recieved the wrong rsp_type\n");
         error(sockfd, rsp_type);
         close(sockfd);
@@ -392,8 +431,27 @@ void request_history (int sockfd, int accountNum, int numTransactions) {
       exit(EXIT_FAILURE);
     }
 
-    int rcvAccNum;
-    int rcvNumTransactions;
+    msg_enum rspMsg;
+    int rcvAccNum, rcvNumTransactions;
+
+    if (read(sockfd, &rspMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("ERROR: get_history failed to read msg\n.");
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
+
+    // make sure message type is account info
+    if (rspMsg = ntohl(rspMsg) != HISTORY) {
+        if (rspMsg == ERROR) {
+            readInMsg(sockfd); // burn extra message, the account didn't exist
+            perror("ERROR: transaction invalid, account didn't exist");
+            return;
+        }
+        perror("ERROR: get_history recieved the wrong msg\n");
+        error(sockfd, rspMsg);
+        close(sockfd);
+        exit(EXIT_FAILURE);
+    }
 
     if (read(sockfd, &rcvAccNum, sizeof(int)) != sizeof(int)) {
         perror("ERROR: request_history failed to read account number\n.");
@@ -483,7 +541,7 @@ int main(int argc, char *argv[]){
     int i = 0;
     while (fscanf(fp, "%d,%d,%64[^,],%64[^,],%ld,%f,%d\n",
             &message_type, &account_number, name, username, &birthday, &amount, &num_transactions) != EOF) {
-        // printf("i: %d \n", i++);
+        printf("i: %d \n", i++);
         if (isConnected == 0) {
             sockfd = connectSocket(servaddr);
         }
@@ -505,10 +563,6 @@ int main(int argc, char *argv[]){
                 get_balance(sockfd, account_number);
                 break;
 
-            case ERROR:
-                error(sockfd, message_type);
-                break;
-
             case TERMINATE:
                 terminate(sockfd);
                 break;
@@ -517,10 +571,12 @@ int main(int argc, char *argv[]){
                 request_history (sockfd, account_number, num_transactions);
                 break;
 
-            default:
-                perror("ERROR: Invalid message type read from input file\n");
-                free(line); free(name); free(username); close(sockfd); fclose(fp);
-                exit(EXIT_FAILURE);
+            default:;
+                // do nothing -- invalid msg -- keep reading
+                
+                // perror("ERROR: Invalid message type read from input file\n");
+                // free(line); free(name); free(username); close(sockfd); fclose(fp);
+                // exit(EXIT_FAILURE);
         }
     }
 
