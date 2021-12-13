@@ -1,10 +1,33 @@
 #include "../include/client.h"
 
 float clientCash = START_CASH;
+int isConnected = 0;
 
 void printSyntax(){
     printf("incorrect usage syntax! \n");
     printf("usage: $ ./client input_filename server_addr server_port\n");
+}
+
+int connectSocket(struct sockaddr_in servaddr) {
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        perror("Socket creation failed...\n");
+        exit(0);
+    }
+    else
+        printf("Socket successfully created..\n");
+
+    // connect the client socket to server socket
+    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
+        perror("Connection with the server failed...\n");
+        exit(0);
+    }
+    else
+        printf("Connected to the server..\n");
+
+    isConnected = 1;
+
+    return sockfd;
 }
 
 // FUNCTION: TERMINATE
@@ -20,6 +43,7 @@ void terminate(int sockfd) {
     }
         
     close(sockfd);
+    isConnected = 0;
     return;
 }
 
@@ -393,41 +417,22 @@ int main(int argc, char *argv[]){
         return 0;
     }
 
-    // Socket create and verification
-    int sockfd, connfd;
-    struct sockaddr_in servaddr, cli;
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd == -1) {
-        perror("Socket creation failed...\n");
-        exit(0);
-    }
-    else
-        printf("Socket successfully created..\n");
+    int sockfd;
+    struct sockaddr_in servaddr;
 
     // Get the correct filepath
     char file[MAX_STR] = "input/";
     strcat(file, argv[1]);
 
-    // Get the server address
+    // Get the server address and port number
     char *server_addr = argv[2];
     bzero(&servaddr, sizeof(servaddr));
-
-
     int port = atoi(argv[3]);
 
     // assign IP, PORT
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(server_addr);
     servaddr.sin_port = htons(port);
-
-    // connect the client socket to server socket
-    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
-        perror("Connection with the server failed...\n");
-        exit(0);
-    }
-    else
-        printf("Connected to the server..\n");
 
     // Time complexity, necessary for assignment
     double cpu_time;
@@ -444,19 +449,20 @@ int main(int argc, char *argv[]){
     long birthday;
     float amount;
 
-    // Necessary for reading in variables
-    char *token, *saveptr;
-    char *pattern = ",";
-
-
     FILE *fp = fopen(file, "r");
     if (fp == NULL) {
       fprintf(stderr, "ERROR: failed to open file %s\n", file);
       exit(EXIT_FAILURE);
     }
 
+    int i = 0;
     while (fscanf(fp, "%d,%d,%64[^,],%64[^,],%ld,%f,%d\n",
             &message_type, &account_number, name, username, &birthday, &amount, &num_transactions) != EOF) {
+        printf("i: %d \n", i++);
+        if (isConnected == 0) {
+            sockfd = connectSocket(servaddr);
+        }
+
         switch(message_type) {
             case REGISTER:
                 register_user(sockfd, name, username, birthday);
