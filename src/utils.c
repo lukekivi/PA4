@@ -24,60 +24,26 @@ void bookeepingCode() {
     _createOutputDir();
 }
 
-msg_enum selectResponse(msg_enum recv) {
-    switch (recv) {
-        case REGISTER:         return BALANCE;
-        case GET_ACCOUNT_INFO: return ACCOUNT_INFO;
-        case TRANSACT:         return BALANCE;
-        case GET_BALANCE:      return BALANCE;
-        case REQUEST_CASH:     return CASH;
-        case REQUEST_HISTORY:  return HISTORY;
-        default: fprintf(stderr, "ERROR: Bad recv argument."); exit(0);
-    }
-}
-
 // writes a string length and then the string itself to the socket fd
 int writeStringToSocket(int sockfd, char* str) {
-    int len = strlen(str) + 1; // +1 for the null terminator
-    int results;
-
-    printf("Len: %d\n", len);
-    int nLen = htonl(len);
-    if (write(sockfd, &nLen, sizeof(int)) != sizeof(int)) {
+    if (write(sockfd, str, MAX_STR) <= 0) {
         perror("ERROR: failed write to sockfd\n");
         return 0;
     }
-
-    printf("String: %s\n", str);
-    if (write(sockfd, str, len) != len) {
-        perror("ERROR: failed write to sockfd\n");
-        return 0;
-    }
-
     return 1;
 }
 
 
 // reads string from the socket and returns it or null for an error val
 char* readStringFromSocket(int sockfd) {
-    int strSize = 0;
-    char* str;
-    if(read(sockfd, &strSize, sizeof(int)) != sizeof(int)) {
-        perror("ERROR: failed to read");
-        return NULL;
-    } 
-    strSize = ntohl(strSize);
+    char* str = (char*) malloc(sizeof(char) * MAX_STR);
 
-    printf("strSize: %d\n", strSize);
-    str = (char*) malloc(sizeof(char) * strSize);
-
-    printf("got here\n");
-    if(read(sockfd, str, strSize) != strSize) {
+    if(read(sockfd, str, MAX_STR) <= 0) {
         perror("ERROR: failed to read");
         free(str);
         return NULL;        
     }
-    printf("String: %s\n", str);
+    
     return str;
 }
 
