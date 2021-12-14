@@ -5,14 +5,6 @@
 #include <sys/wait.h>
 
 int main(int argc, char *argv[]){
-    /** 
-     * args:
-     *   -   1: local address
-     *   -   2: port number
-     *   -   3: num workers
-     *   - 4+n: input files
-     */
-
 
     // fork and exec the server
     pid_t server_pid;
@@ -44,6 +36,12 @@ int main(int argc, char *argv[]){
         {
             printf("Failed to launch server.\n");
             exit(EXIT_FAILURE);
+        }
+        // sleep to allow the registration messages to be delivered
+        // to prevent a race condition with the transactions
+        if (c == 4)
+        {
+            sleep(3);
         }
         c++;
     }

@@ -71,6 +71,21 @@ struct account {
  */
  char* readStringFromSocket(int sockfd);
 
+/**
+ * Write an enum to socket
+ * @param sockfd
+ * @param msg
+ * @return -1 for failure, 1 for success
+ */
+int writeEnum(int sockfd , msg_enum msg);
+
+/**
+ * Read enum from socket
+ * @param sockfd
+ * @return msg_enum or -1 for failure
+ */
+msg_enum readEnum(int sockfd);
+
 /**** Queue Code ****/
 
 /**
