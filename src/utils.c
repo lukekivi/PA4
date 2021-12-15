@@ -43,7 +43,7 @@ char* readStringFromSocket(int sockfd) {
         free(str);
         return NULL;        
     }
-    
+
     return str;
 }
 

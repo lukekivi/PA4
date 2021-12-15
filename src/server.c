@@ -48,7 +48,7 @@ int handleRegister(int sockfd) {
     acc->name = name;
     acc->birthday = birthday;
     acc->balance = 0.0;
-    acc->transactions = (float*) malloc(sizeof(float));
+    acc->transactions = (float*) malloc(sizeof(float) * STARTING_TRANSACTIONS_SIZE);
     acc->numTransactions = 0;
     acc->transactionsSize = STARTING_TRANSACTIONS_SIZE;
 
@@ -164,6 +164,7 @@ int respondBalance(int sockfd, int accNum, float balance) {
 // FUNCTION: ADDTRANSACTION
 // Adds to an accounts balance.
 int addTransaction(int accountNumber, float transaction) {
+
     sem_wait(&mutexBalances[accountNumber]);
     struct account* acc = balances[accountNumber];
 
