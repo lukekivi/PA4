@@ -57,14 +57,6 @@ struct account {
 };
 
 /**
- * Selects the response enum. For use in server. If the enum doesn't have a response it triggers 
- * an error and exits
- * @param recv received enum
- * @return     the correct response enum
- */
-msg_enum selectResponse(msg_enum recv);
-
-/**
  * Write a string length and then the string itself to sockfd
  * @param sockfd the socket file descriptor to read from
  * @param str    the string to be written
@@ -78,6 +70,21 @@ msg_enum selectResponse(msg_enum recv);
  * @return a pointer to a character array, or NULL for an error value
  */
  char* readStringFromSocket(int sockfd);
+
+/**
+ * Write an enum to socket
+ * @param sockfd
+ * @param msg
+ * @return -1 for failure, 1 for success
+ */
+int writeEnum(int sockfd , msg_enum msg);
+
+/**
+ * Read enum from socket
+ * @param sockfd
+ * @return msg_enum or -1 for failure
+ */
+msg_enum readEnum(int sockfd);
 
 /**** Queue Code ****/
 

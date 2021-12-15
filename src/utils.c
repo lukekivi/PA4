@@ -24,60 +24,47 @@ void bookeepingCode() {
     _createOutputDir();
 }
 
-msg_enum selectResponse(msg_enum recv) {
-    switch (recv) {
-        case REGISTER:         return BALANCE;
-        case GET_ACCOUNT_INFO: return ACCOUNT_INFO;
-        case TRANSACT:         return BALANCE;
-        case GET_BALANCE:      return BALANCE;
-        case REQUEST_CASH:     return CASH;
-        case REQUEST_HISTORY:  return HISTORY;
-        default: fprintf(stderr, "ERROR: Bad recv argument."); exit(0);
-    }
-}
-
 // writes a string length and then the string itself to the socket fd
 int writeStringToSocket(int sockfd, char* str) {
-    int len = strlen(str) + 1; // +1 for the null terminator
-    int results;
-
-    int nLen = htonl(len);
-
-    if (write(sockfd, &nLen, sizeof(int)) != sizeof(int)) {
-        perror("ERROR: failed write to sockfd\n");
-        return 0;
+    if (write(sockfd, str, MAX_STR) <= 0) {
+        perror("ERROR: failed to write stringto sockfd\n");
+        return -1;
     }
-
-    if (write(sockfd, str, len) != len) {
-        perror("ERROR: failed write to sockfd\n");
-        return 0;
-    }
-
     return 1;
 }
 
 
 // reads string from the socket and returns it or null for an error val
 char* readStringFromSocket(int sockfd) {
-    int strSize = 0;
-    char* str;
+    char* str = (char*) malloc(sizeof(char) * MAX_STR);
 
-    if(read(sockfd, &strSize, sizeof(int)) != sizeof(int)) {
-        perror("ERROR: failed to read");
-        return NULL;
-    } 
-
-    strSize = ntohl(strSize);
-    str = (char*) malloc(sizeof(char) * strSize);
-
-        
-    if(read(sockfd, str, strSize) != strSize) {
-        perror("ERROR: failed to read");
+    if(read(sockfd, str, MAX_STR) <= 0) {
+        perror("ERROR: failed to read string from socket\n");
         free(str);
         return NULL;        
     }
-    
+
     return str;
+}
+
+// writes enum to socket, returns 1 for success, -1 for failure
+int writeEnum(int sockfd , msg_enum msg) {
+    if (write(sockfd, &msg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("ERROR: failed to write msg to socket\n");
+        return -1;
+    }
+    return 1;
+}
+
+// reads enum from socket, returns msg or -1 for failure
+msg_enum readEnum(int sockfd) {
+    msg_enum msg;
+    if (read(sockfd, &msg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+        perror("ERROR: failed to write msg to socket\n");
+        return -1;
+    }
+
+    return msg;
 }
 
 /* Return a pointer to an initialized queue */
@@ -93,10 +80,12 @@ struct Queue* initQueue() {
 
 /* initialize a node */ 
 struct Node* initNode(int sockfd) {
+    // printf("Got here 3.1\n");
     struct Node* node = (struct Node*) malloc(sizeof(struct Node));
+    // printf("Got here 3.2\n");
     node->next = NULL;
     node->sockfd = sockfd;
-
+    // printf("Got here 3.3\n");
     return node;
 }
 
