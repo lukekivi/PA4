@@ -447,6 +447,10 @@ void request_history (int sockfd, int accountNum, int numTransactions) {
             exit(EXIT_FAILURE);
         }
     }
+
+    for (int i = 0; i < rcvNumTransactions; i++) {
+        printf("acc[%d]->tran[%d]:\t%.2f\n", rcvAccNum, i, transactions[i]);
+    }
 }
 
 int main(int argc, char *argv[]){

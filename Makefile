@@ -7,7 +7,7 @@ INCLDIR=include
 LIBDIR=lib
 
 LOCALADDR=127.0.0.1
-PORT=9004 #edit this with your own port number
+PORT=9069 #edit this with your own port number
 
 launcher: $(SRCDIR)/launcher.c $(LIBDIR)/utils.o client server
 	$(CC) $(CLINK) $(CFLAGS) -I$(INCLDIR) $(LIBDIR)/utils.o $(SRCDIR)/launcher.c -o launcher
@@ -51,9 +51,9 @@ t3: launcher
 t4: launcher # this tests for the transaction history extra credit
 	./launcher $(LOCALADDR) $(PORT) 1 input4.csv
 	diff expected/balances4.csv output/balances.csv
-	diff expected/account_0.csv output/account_0.csv
-	diff expected/account_1.csv output/account_1.csv
-	diff expected/account_2.csv output/account_2.csv
+	diff expected/account0.csv output/account0.csv
+	diff expected/account1.csv output/account1.csv
+	diff expected/account2.csv output/account2.csv
 	@echo passed
 
 .PHONY: clean run1 run2 run3 run4 t1 t2 t3 t4
