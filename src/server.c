@@ -43,6 +43,8 @@ int handleRegister(int sockfd) {
         perror("ERROR: failure to read from sockfd\n");
         return -1;
     }
+
+    // fill an account struct
     struct account* acc = (struct account*) malloc(sizeof(struct account) * STARTING_TRANSACTIONS_SIZE);
     acc->username = username;
     acc->name = name;
@@ -52,6 +54,7 @@ int handleRegister(int sockfd) {
     acc->numTransactions = 0;
     acc->transactionsSize = STARTING_TRANSACTIONS_SIZE;
 
+    // load the account into balances
     sem_wait(&numAccountsMutex);
     balances[numAccounts] = acc;
     int accountNumber = numAccounts;
@@ -121,8 +124,9 @@ int getBalance(int sockfd) {
         return -1;
     }
 
+    // check if the accountNumber is valid
     if (!validAccount(accountNumber)) {
-        perror("ERROR: account doesn't exist.");
+        perror("ERROR: account doesn't exist.\n");
         return 0;
     }
 
@@ -130,6 +134,7 @@ int getBalance(int sockfd) {
     float balance = balances[accountNumber]->balance;
     sem_post(&mutexBalances[accountNumber]);
 
+    // write back the balance
     if (respondBalance(sockfd, accountNumber, balance) == 0) {
         perror("ERROR: from getBalance, occurred within respondBalance\n");
         return -1;
@@ -164,7 +169,6 @@ int respondBalance(int sockfd, int accNum, float balance) {
 // FUNCTION: ADDTRANSACTION
 // Adds to an accounts balance.
 int addTransaction(int accountNumber, float transaction) {
-
     sem_wait(&mutexBalances[accountNumber]);
     struct account* acc = balances[accountNumber];
 
@@ -179,6 +183,7 @@ int addTransaction(int accountNumber, float transaction) {
         return -1;
 
     } else if (acc->numTransactions == acc->transactionsSize) {
+        // need to resize the transaction array because it is full
         acc->transactionsSize *= 2;
         acc->transactions = (float *) realloc(acc->transactions, sizeof(float) * acc->transactionsSize);
 
@@ -189,6 +194,7 @@ int addTransaction(int accountNumber, float transaction) {
         }
     }
 
+    // actually do the transaction
     acc->transactions[acc->numTransactions] = transaction;
     acc->numTransactions += 1;
     acc->balance += transaction;
@@ -197,6 +203,7 @@ int addTransaction(int accountNumber, float transaction) {
 
     float balance = acc->balance;
     sem_post(&mutexBalances[accountNumber]);
+
     return balance;
 }
 
@@ -205,6 +212,7 @@ int addTransaction(int accountNumber, float transaction) {
 int getTransactions(int accountNumber, int numTransactions, float** arr) {
     sem_wait(&mutexBalances[accountNumber]);
     struct account* acc = balances[accountNumber];
+
     if (acc == NULL) {
         sem_post(&mutexBalances[accountNumber]);
         perror("ERROR: Account number indexed a NULL account\n");
@@ -213,15 +221,19 @@ int getTransactions(int accountNumber, int numTransactions, float** arr) {
 
     int size = numTransactions;
     if (numTransactions == 0 || acc->numTransactions < numTransactions) {
+        // if numTransactions is 0 the user wants to receive all transactions.
+        // if numTransactions is greater than the actual amount of transactions
+        // we will return all we have.
         size = acc->numTransactions;
     }
-
+    // allocate space for the passed array
     *arr = (float *) malloc(sizeof(float) * size);
 
     for (int i = 0; i < size; i++) {
         (*arr)[i] = acc->transactions[i];
     }
     sem_post(&mutexBalances[accountNumber]);
+
     return size;
 }
 
@@ -251,6 +263,7 @@ int transact(int sockfd) {
         return -1;
     }
 
+    // respondBalance handles the response
     if (respondBalance(sockfd, accNum, balance) == 0) {
         perror("ERROR: in transact, occurred within respondBalance.\n");
         return -1;
@@ -346,11 +359,13 @@ int getHistory(int sockfd) {
         return -1;
     }
 
+    // write how many transactions will be coming
     if (write(sockfd, &numTrans, sizeof(int)) != sizeof(int)) {
         perror("ERROR: getHistory - failed to write the number of transactions\n");
         return -1;
     }
 
+    // send the transactions
     for (int i = 0; i < numTrans; i++) {
         if (write(sockfd, &transactions[i], sizeof(float)) != sizeof(float)) {
             perror("ERROR: getHistory - failed to write transactions\n");
@@ -377,7 +392,7 @@ int validAccount(int accountNumber) {
 }
 
 // FUNCTION: FREEBALANCES
-// Free the balances of the array.
+// Free the balances of the array in case of an error.
  void freeBalances() {
      sem_wait(&numAccountsMutex);
      for (int i = 0; i < numAccounts; i++) {
@@ -404,11 +419,14 @@ int validAccount(int accountNumber) {
 int sendError(int sockfd, msg_enum msg) {
     msg_enum error_msg = ERROR;
 
+    // send ERROR
     if (writeEnum(sockfd, error_msg) == -1) {
         perror("ERROR: sendError - failed to write ERROR to socket\n");
         return -1;
     }
 
+    // send causal msg, or ERROR if account didn't exist and we will not responding with
+    // valid data
     if (writeEnum(sockfd, msg) == -1) {
         perror("ERROR: sendError - failed to write MSG to socket\n");
         return -1;
@@ -426,9 +444,9 @@ void printSyntax() {
 // FUNCTION: WRITELOG
 // Writes to the log file.
 void* writeLog() {
-    char file[MAX_STR] = "output/balances.csv";
+    char* file = "output/balances.csv";
+    char* account_file_substring = "output/account";
 
-    int i = 0;
     while(1) {
         FILE *fp = fopen(file, "w");
         if (fp == NULL) {
@@ -436,15 +454,34 @@ void* writeLog() {
             exit(EXIT_FAILURE);
         }
 
-        sem_wait(&numAccountsMutex);
         int curNumAccounts = numAccounts;
-        sem_post(&numAccountsMutex);
 
+        // Log information from each account
         for (int i=0; i < curNumAccounts; i++) {
+            // open a file for transactions
+            char account_file_name[MAX_STR];
+            sprintf(account_file_name, "%s%d.csv", account_file_substring, i);
+            FILE* account_fp = fopen(account_file_name, "w");
+
+            if (account_fp == NULL) {
+                fprintf(stderr, "ERROR: failed to open file %s\n", file);
+                exit(EXIT_FAILURE);
+            }
+
             sem_wait(&mutexBalances[i]);
             struct account* acc = balances[i];
+        
+            // log account information
             fprintf(fp, "%d,%.2f,%s,%s,%ld\n", i, acc->balance, acc->name, acc->username,acc->birthday);
+            
+
+            // log transactions
+            for (int j = 0; j < acc->numTransactions; j++) {
+                fprintf(account_fp, "%.2f\n", acc->transactions[j]);
+            }
+
             sem_post(&mutexBalances[i]);
+            fclose(account_fp);
         }
         fclose(fp);
         sleep(LOGGER_SLEEP);
@@ -458,10 +495,13 @@ void* writeLog() {
  ************/
 void* worker(void* arg) {
     while(1) {
+
+        // wait for data to be staged in q
         sem_wait(&staged);
         sem_wait(&mutexQueue);
-        int sockfd = dequeue(q);
+        int sockfd = dequeue(q); // dequeue strips node of its sockfd and returns it
         sem_post(&mutexQueue);
+
         if (sockfd < 0) {
             perror("tried to dequeue from an empty queue");
             exit(EXIT_FAILURE);
@@ -490,12 +530,14 @@ void* worker(void* arg) {
                 case REGISTER:
                     accountNumber = handleRegister(sockfd);
                     if (accountNumber < 0) {
+                        // error within handleRegister
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
                     }
 
                     if (respondRegister(sockfd, accountNumber) == 0) {
+                        // error within respondRegister
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
@@ -505,10 +547,12 @@ void* worker(void* arg) {
                 case GET_ACCOUNT_INFO:
                     results = getAccountInfo(sockfd);
                     if (results == -1) {
+                        // error within getAccountInfo
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
                     } else if (results == 0) {
+                        // account number was invalid
                         if (sendError(sockfd, ERROR) == -1 ) {
                             freeBalances();
                             close(sockfd);
@@ -520,10 +564,12 @@ void* worker(void* arg) {
                 case TRANSACT:
                     results = transact(sockfd);
                     if (results == -1) {
+                        // error within transact
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
                     } else if (results == 0) {
+                        // account number was invalid
                         if (sendError(sockfd, ERROR) == -1 ) {
                             freeBalances();
                             close(sockfd);
@@ -535,10 +581,12 @@ void* worker(void* arg) {
                 case GET_BALANCE:
                     results = getBalance(sockfd);
                     if (results == -1) {
+                        // error within getBalance
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
                     } else if (results == 0) {
+                        // account number was invalid
                         if (sendError(sockfd, ERROR) == -1 ) {
                             freeBalances();
                             close(sockfd);
@@ -549,6 +597,7 @@ void* worker(void* arg) {
                     break;
                 case REQUEST_CASH:
                     if (cashRequest(sockfd) == -1) {
+                        // error within cashRequest
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
@@ -558,11 +607,13 @@ void* worker(void* arg) {
                 case REQUEST_HISTORY:
                     results = getHistory(sockfd);
                     if (results == -1) {
+                        // error within getHistory
                         freeBalances();
                         close(sockfd);
                         exit(EXIT_FAILURE);
                     } else if (results == 0) {
                         if (sendError(sockfd, ERROR) == -1 ) {
+                            // account number was invalid
                             freeBalances();
                             close(sockfd);
                             exit(EXIT_FAILURE);
@@ -571,8 +622,8 @@ void* worker(void* arg) {
 
                     break;
                 case ERROR:
-                    // Have to receive the message that caused the error
-                    if (read(sockfd, &replyMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
+                    // Receive the message that caused the error
+                    if ((replyMsg = readEnum(sockfd)) == -1) {
                         perror("ERROR: worker - Cannot read from sockfd\n.");
                         close(sockfd);
                         freeBalances();
@@ -581,12 +632,10 @@ void* worker(void* arg) {
 
                     break;
                 default:
+                    // shouldn't be possible to get here
                     sendError(sockfd, recv);
-
                     perror("ERROR: worker - Bad recv argument.\n");
-                    freeBalances();
                     close(sockfd);
-                    exit(0);
             }
         }
 
@@ -698,4 +747,6 @@ int main(int argc, char *argv[]) {
 
         sem_post(&staged);
     }
+
+    // no need for joining threads as this while loop will never end organically
 }
