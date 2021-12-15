@@ -16,7 +16,6 @@ int connectSocket(struct sockaddr_in servaddr) {
       close(sockfd);
       exit(EXIT_FAILURE);
     }
-    // else printf("Socket successfully created..\n");
 
     // connect the client socket to server socket
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) != 0) {
@@ -24,7 +23,6 @@ int connectSocket(struct sockaddr_in servaddr) {
       close(sockfd);
       exit(EXIT_FAILURE);
     }
-    // else printf("Connected to the server..\n");
 
     isConnected = 1;
     return sockfd;
@@ -503,12 +501,9 @@ int main(int argc, char *argv[]){
     char* line = NULL; 
     size_t len = 0;
 
-    int reconnects = -1;
-    int i = 0;
     while (getline(&line, &len, fp) != -1) {
         if (isConnected == 0) {
             sockfd = connectSocket(servaddr);
-            reconnects++;
         }
 
 
@@ -517,8 +512,6 @@ int main(int argc, char *argv[]){
         char username[MAX_STR];
         time_t birthday;
         float amount;
-
-        i++;
 
         // scape the enum
         if (sscanf(line, "%d", &message_type) != 1) {
@@ -530,6 +523,7 @@ int main(int argc, char *argv[]){
             continue;
         } else if (message_type == TERMINATE) {
             terminate(sockfd);
+            prev_msg = message_type;
             continue;
         }
 
@@ -537,6 +531,7 @@ int main(int argc, char *argv[]){
         if ((results = sscanf(line, "%d,%d,%64[^,],%64[^,],%ld,%f,%d\n", &message_type, &account_number, name, username, &birthday, &amount, &num_transactions)) != 7) {
             // incomplete line
             perror("ERROR: main 2 - read in an incomplete line");
+            prev_msg = message_type;
             continue;
         }
 
@@ -566,8 +561,6 @@ int main(int argc, char *argv[]){
         }
         prev_msg = message_type;
     }
-
-    printf("**** COMPLETE file: %s\t iters: %d\tprev_msg: %d\t reconnects: %d\n", file, i, prev_msg, reconnects);
 
     if (prev_msg != TERMINATE) {
         terminate(sockfd);

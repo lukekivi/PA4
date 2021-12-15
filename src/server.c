@@ -436,9 +436,9 @@ void* writeLog() {
             exit(EXIT_FAILURE);
         }
 
-        // sem_wait(&numAccountsMutex);
+        sem_wait(&numAccountsMutex);
         int curNumAccounts = numAccounts;
-        // sem_post(&numAccountsMutex);
+        sem_post(&numAccountsMutex);
 
         for (int i=0; i < curNumAccounts; i++) {
             sem_wait(&mutexBalances[i]);
@@ -483,13 +483,11 @@ void* worker(void* arg) {
 
             // when TERMINATE is received close the connection and wait
             if (recv == TERMINATE) {
-                // printf("TERMINATE\n");
                 break;
             }
 
             switch (recv) {
                 case REGISTER:
-                    // printf("REGISTER\n");
                     accountNumber = handleRegister(sockfd);
                     if (accountNumber < 0) {
                         freeBalances();
@@ -505,7 +503,6 @@ void* worker(void* arg) {
 
                     break;
                 case GET_ACCOUNT_INFO:
-                    // printf("GET_ACCOUNT_INFO\n");
                     results = getAccountInfo(sockfd);
                     if (results == -1) {
                         freeBalances();
@@ -521,7 +518,6 @@ void* worker(void* arg) {
 
                     break;
                 case TRANSACT:
-                    // printf("TRANSACT\n");
                     results = transact(sockfd);
                     if (results == -1) {
                         freeBalances();
@@ -537,7 +533,6 @@ void* worker(void* arg) {
 
                     break;
                 case GET_BALANCE:
-                    // printf("GET_BALANCE\n");
                     results = getBalance(sockfd);
                     if (results == -1) {
                         freeBalances();
@@ -553,7 +548,6 @@ void* worker(void* arg) {
 
                     break;
                 case REQUEST_CASH:
-                    // printf("REQUEST_CASH\n");
                     if (cashRequest(sockfd) == -1) {
                         freeBalances();
                         close(sockfd);
@@ -562,7 +556,6 @@ void* worker(void* arg) {
 
                     break;
                 case REQUEST_HISTORY:
-                    // printf("REQUEST_HISTORY\n");
                     results = getHistory(sockfd);
                     if (results == -1) {
                         freeBalances();
@@ -578,7 +571,6 @@ void* worker(void* arg) {
 
                     break;
                 case ERROR:
-                    // printf("ERROR\n");
                     // Have to receive the message that caused the error
                     if (read(sockfd, &replyMsg, sizeof(msg_enum)) != sizeof(msg_enum)) {
                         perror("ERROR: worker - Cannot read from sockfd\n.");
@@ -643,7 +635,6 @@ int main(int argc, char *argv[]) {
       close(sockfd);
       exit(EXIT_FAILURE);
     }
-    // else printf("Socket successfully created...\n");
     
     bzero(&servaddr, sizeof(servaddr));
 
@@ -657,17 +648,16 @@ int main(int argc, char *argv[]) {
       perror("ERROR: Socket bind failed.\n");
       close(sockfd);
       exit(EXIT_FAILURE);
-    }   // else printf("Socket successfully binded..\n");
+    } 
 
     // Now server is ready to listen and verification
     if ((listen(sockfd, NCLIENTS)) != 0) {
       perror("ERROR: Listen failed.\n");
       close(sockfd);
       exit(EXIT_FAILURE);
-    } // else printf("Server listening..\n");
+    } 
 
     len = sizeof(cli);
-
 
     /** Data structure and semaphore initializations **/
     q = initQueue();
@@ -698,16 +688,14 @@ int main(int argc, char *argv[]) {
         if (sockfd < 0) {
           perror("ERROR: Server accept failed.\n");
           exit(EXIT_FAILURE);
-        } else {
-            // printf("Server accept the client...\n");
-
-            struct Node* node = initNode(newSockfd);
-
-            sem_wait(&mutexQueue);
-            enqueue(q, node);
-            sem_post(&mutexQueue);
-
-            sem_post(&staged);
         }
+
+        struct Node* node = initNode(newSockfd);
+
+        sem_wait(&mutexQueue);
+        enqueue(q, node);
+        sem_post(&mutexQueue);
+
+        sem_post(&staged);
     }
 }
