@@ -3,10 +3,12 @@
 
 * Project group number, group member names and x500 addresses
 * Group #45 -
-* Lucas Kivi kivix019 - server and client
+* Lucas Kivi kivix019 - server, client, helper functions, testing and debugging, extra credit
 * Viet Nguyen nguy4471 - server
 * Dallas Schauer schau364 - client
 
-* Whether to complete the extra task
-* Any assumptions outside this documen: No
-* How to compile and run your program
+* Whether to complete the extra task: Yes
+* Any assumptions outside this document: No
+* How to compile and run your program:
+  $make clean
+  $make run1 | $make run2 | $make run3 | $make run4
