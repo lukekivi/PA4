@@ -5,7 +5,7 @@
 * Group #45 -
 * Lucas Kivi kivix019 - server, client, helper functions, testing and debugging, extra credit
 * Viet Nguyen nguy4471 - server
-* Dallas Schauer schau364 - client
+* Dallas Schauer schau364 - client, client functions, testing
 
 * Whether to complete the extra task: Yes
 * Any assumptions outside this document: No
