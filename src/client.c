@@ -1,3 +1,8 @@
+/*test machine: csel-potato.cselabs.umn.edu
+ * group number: G[45]
+ * name: Lucas Kivi, Dallas Schauer, Viet Nguyen
+ * x500: kivix019, schau364, nguy4471 */
+
 #include "../include/client.h"
 
 float clientCash = START_CASH; // the starting cash that client starts out with.
